@@ -6,7 +6,6 @@ import javax.net.ssl.TrustManager;
 import javax.net.ssl.X509TrustManager;
 import javax.swing.*;
 import javax.swing.border.LineBorder;
-import javax.swing.table.DefaultTableCellRenderer;
 import javax.swing.table.DefaultTableModel;
 import java.awt.*;
 import java.awt.event.WindowAdapter;
@@ -19,8 +18,8 @@ import java.nio.channels.Channels;
 import java.nio.channels.ReadableByteChannel;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.*;
 import java.util.List;
+import java.util.*;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -33,6 +32,7 @@ import java.util.stream.IntStream;
  */
 public class ResourceDownLoader extends AppFrame {
 
+    private final int KB = 1024;
     private JTextField txtDest, txtSource;
     private JButton btnDownload, btnCancel, btnExit;
     private JTable tblInfo;
@@ -42,19 +42,21 @@ public class ResourceDownLoader extends AppFrame {
     private final int DEFAULT_NUM_ROWS = 6;
 
     public enum COLS {
-        IDX(0, "#", "center"),
-        PATH(1, "Path", "left"),
-        NAME(2, "Name", "left"),
-        PERCENT(3, "Percent", "center"),
-        TIME(4, "Time in sec", "center");
+        IDX(0, "#", "center", 50),
+        PATH(1, "Path", "left", 0),
+        NAME(2, "Name", "left", -1),
+        PERCENT(3, "Percent", "left", 100),
+        SIZE(4, "Size", "center", 150),
+        TIME(5, "Time in sec", "center", 100);
 
         String name, alignment;
-        int idx;
+        int idx, width;
 
-        COLS(int idx, String name, String alignment) {
+        COLS(int idx, String name, String alignment, int width) {
             this.name = name;
             this.idx = idx;
             this.alignment = alignment;
+            this.width = width;
         }
 
         public String getName() {
@@ -67,6 +69,10 @@ public class ResourceDownLoader extends AppFrame {
 
         public String getAlignment() {
             return alignment;
+        }
+
+        public int getWidth() {
+            return width;
         }
     }
 
@@ -174,20 +180,13 @@ public class ResourceDownLoader extends AppFrame {
 
         tblInfo = new JTable(model);
         tblInfo.setBorder(new LineBorder(Color.BLACK, 1));
-        tblInfo.getColumnModel().getColumn(COLS.PERCENT.getIdx()).setMaxWidth(200);
-        tblInfo.getColumnModel().getColumn(COLS.TIME.getIdx()).setMaxWidth(250);
-        tblInfo.getColumnModel().getColumn(COLS.IDX.getIdx()).setMaxWidth(70);
 
         // For making contents non editable
         tblInfo.setDefaultEditor(Object.class, null);
-        // For tooltip
-        //tblInfo.setDefaultRenderer(Object.class, new CellRenderer());
 
         tblInfo.setAutoscrolls(true);
         tblInfo.setPreferredScrollableViewportSize(tblInfo.getPreferredSize());
-        // this col contains tooltip
-        tblInfo.getColumnModel().getColumn(COLS.PATH.getIdx()).setMinWidth(0);
-        tblInfo.getColumnModel().getColumn(COLS.PATH.getIdx()).setMaxWidth(0);
+        // PATH col contains tooltip
 
         CellRendererLeftAlign leftRenderer = new CellRendererLeftAlign();
         CellRendererCenterAlign centerRenderer = new CellRendererCenterAlign();
@@ -195,7 +194,15 @@ public class ResourceDownLoader extends AppFrame {
         for (COLS col : COLS.values()) {
             tblInfo.getColumnModel().getColumn(col.getIdx()).setCellRenderer(
                     col.getAlignment().equals("center") ? centerRenderer : leftRenderer);
+
+            if (col.getWidth() != -1) {
+                tblInfo.getColumnModel().getColumn(col.getIdx()).setMinWidth(col.getWidth());
+                tblInfo.getColumnModel().getColumn(col.getIdx()).setMaxWidth(col.getWidth());
+            }
         }
+
+        tblInfo.getColumnModel().getColumn(COLS.PERCENT.getIdx()).setCellRenderer(new CellRendererProgressBar());
+
     }
 
     private void createDefaultRows() {
@@ -245,10 +252,9 @@ public class ResourceDownLoader extends AppFrame {
         String url = resourceInfo.getUrl();
         logger.log("Trying url [" + url + "]");
         try {
-            int KB = 1024;
             URL u = new URL(url);
             URLConnection uc = u.openConnection();
-            FileInfo fileInfo = new FileInfo(url, getDestPath(url), uc.getContentLength());
+            FileInfo fileInfo = new FileInfo(url, getDestPath(url), uc.getContentLength(), System.currentTimeMillis());
             logger.log("Url resource size is [" + fileInfo.getSize() + "] Bytes i.e. [" + (fileInfo.getSize() / KB) + "] KB");
 
             ReadableByteChannel rbc = Channels.newChannel(u.openStream());
@@ -391,7 +397,7 @@ public class ResourceDownLoader extends AppFrame {
             if (!resourceInfo.isCancelled()) {
                 long diffTime = (System.currentTimeMillis() - startTime);
                 long diffTimeInSec = TimeUnit.MILLISECONDS.toSeconds(diffTime);
-                resourceInfo.getFileInfo().setTimeToDownloadInSec(diffTimeInSec);
+                resourceInfo.getFileInfo().setDownloadInSec(diffTimeInSec);
                 rd.logger.log("download complete for " + resourceInfo);
                 rd.updateDownloadTime(resourceInfo.getUrl(), diffTimeInSec);
             }
@@ -412,8 +418,9 @@ public class ResourceDownLoader extends AppFrame {
             this.urlsToDownload = urlsToDownload;
         }
 
+
         @Override
-        public Boolean call() throws Exception {
+        public Boolean call() {
             urlsToDownload.forEach((k, v) -> rd.downLoad(v));
             return true;
         }
@@ -447,6 +454,7 @@ public class ResourceDownLoader extends AppFrame {
                 long size = Files.size(Utils.createPath(fileInfo.getDest()));
                 sbLogInfo.append(", Downloaded size [").append(size).append("/").append(fileSize).append("]");
                 percent = (int) ((size * 100) / fileSize);
+                resourceInfo.getFileInfo().setDownloadedSize(size);
                 sbLogInfo.append(", percent ").append(percent).append("%");
 
                 // since we are invoking thread every 200 ms - for now changing to 1sec
@@ -465,7 +473,7 @@ public class ResourceDownLoader extends AppFrame {
                 rd.updateTitle(percent + "% at [" + speedStr + "]");
                 rd.logger.log(sbLogInfo.toString());
 
-                rd.updatePercent(fileInfo.getSrc(), percent);
+                rd.updateFileStatus(fileInfo, percent);
 
                 Thread.sleep(250);
             } while (percent < 100);
@@ -482,34 +490,33 @@ public class ResourceDownLoader extends AppFrame {
         }
     }
 
-    private void updatePercent(String src, int percent) {
+    private void updateFileStatus(FileInfo fileInfo, int percent) {
+        String src = fileInfo.getSrc();
         for (int i = 0; i < tblInfo.getRowCount(); i++) {
             if (tblInfo.getValueAt(i, COLS.NAME.getIdx()).equals(Utils.getFileName(src))) {
                 tblInfo.setValueAt(percent, i, COLS.PERCENT.getIdx());
+                tblInfo.setValueAt(getDownloadSize(fileInfo), i, COLS.SIZE.getIdx());
+                tblInfo.setValueAt(getDownloadTime(fileInfo), i, COLS.TIME.getIdx());
             }
         }
     }
-}
 
-abstract class CellRenderer extends DefaultTableCellRenderer {
+    private String getDownloadSize(FileInfo fileInfo) {
+        float size = fileInfo.getSize() / KB;
+        float dsize = fileInfo.getDownloadedSize() / KB;
+        String suffix = "KB";
+        if (size > KB) {
+            // converting to MB
+            size /= KB;
+            dsize /= KB;
+            suffix = "MB";
+        }
+        return String.format("%.2f", dsize) + "/" + String.format("%.2f", size) + suffix;
 
-    @Override
-    public Component getTableCellRendererComponent(JTable table, Object value, boolean isSelected, boolean hasFocus, int row, int column) {
-        setToolTipText(table.getValueAt(row, ResourceDownLoader.COLS.PATH.getIdx()).toString());
-        return super.getTableCellRendererComponent(table, value, isSelected, hasFocus, row, column);
+    }
+
+    private String getDownloadTime(FileInfo fileInfo) {
+        return fileInfo.getDownloadInSec() + "";
     }
 }
 
-class CellRendererLeftAlign extends CellRenderer {
-
-    public CellRendererLeftAlign() {
-        setHorizontalAlignment(SwingConstants.LEFT);
-    }
-}
-
-class CellRendererCenterAlign extends CellRenderer {
-
-    public CellRendererCenterAlign() {
-        setHorizontalAlignment(SwingConstants.CENTER);
-    }
-}

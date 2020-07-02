@@ -1,14 +1,19 @@
 package com.sv.downloader;
 
+import java.util.concurrent.TimeUnit;
+
 class FileInfo {
     private final String src, dest;
     private final long size;
-    private long timeToDownloadInSec;
+    private long downloadedSize;
+    private long downloadStartTime;
+    private long downloadInSec;
 
-    FileInfo(String src, String dest, int size) {
+    FileInfo(String src, String dest, int size, long downloadStartTime) {
         this.src = src;
         this.dest = dest;
         this.size = size;
+        this.downloadStartTime = downloadStartTime;
     }
 
     public String getSrc() {
@@ -23,12 +28,25 @@ class FileInfo {
         return size;
     }
 
-    public long getTimeToDownloadInSec() {
-        return timeToDownloadInSec;
+    public long getDownloadStartTime() {
+        return downloadStartTime;
     }
 
-    public void setTimeToDownloadInSec(long timeToDownloadInSec) {
-        this.timeToDownloadInSec = timeToDownloadInSec;
+    public long getDownloadInSec() {
+        downloadInSec = TimeUnit.MILLISECONDS.toSeconds(System.currentTimeMillis() - downloadStartTime);
+        return downloadInSec;
+    }
+
+    public long getDownloadedSize() {
+        return downloadedSize;
+    }
+
+    public void setDownloadedSize(long downloadedSize) {
+        this.downloadedSize = downloadedSize;
+    }
+
+    public void setDownloadInSec(long downloadInSec) {
+        this.downloadInSec = downloadInSec;
     }
 
     @Override
@@ -37,7 +55,7 @@ class FileInfo {
                 "src='" + src + '\'' +
                 ", dest='" + dest + '\'' +
                 ", size=" + size +
-                ", timeToDownloadInSec=" + timeToDownloadInSec +
+                ", timeToDownloadInSec=" + downloadInSec +
                 '}';
     }
 }
