@@ -12,3 +12,6 @@ Once download starts, UI shows the progress of each file and internet speed.
 
 Attaching screen shot:
 ![Image of Yaktocat](https://github.com/svermaji/ResourceDownloader/blob/master/rd.png) 
+
+Attaching screen shot with progress bar changes:
+![Image of Yaktocat](https://github.com/svermaji/ResourceDownloader/blob/master/rd-with-progress-bars.png) 
