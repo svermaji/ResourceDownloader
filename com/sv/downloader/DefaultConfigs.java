@@ -47,6 +47,22 @@ public class DefaultConfigs {
         }
     }
 
+    public void saveAllConfigs(ResourceDownLoader rsd) {
+        saveConfig(rsd);
+        saveUrls(rsd);
+    }
+
+    private void saveUrls(ResourceDownLoader rsd) {
+        logger.log ("Saving urls.");
+        try {
+            FileOutputStream fos = new FileOutputStream(rsd.getUrlsToDownload());
+            fos.write(rsd.getDownloadingUrls().getBytes());
+        } catch (IOException e) {
+            logger.error ("Error in saving urls.");
+            logger.error (e);
+        }
+    }
+
     public void saveConfig(ResourceDownLoader rsd) {
         logger.log ("Saving properties.");
         configs.clear();

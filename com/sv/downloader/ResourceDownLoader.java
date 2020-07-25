@@ -5,6 +5,8 @@ import javax.net.ssl.SSLContext;
 import javax.net.ssl.TrustManager;
 import javax.net.ssl.X509TrustManager;
 import javax.swing.*;
+import javax.swing.border.Border;
+import javax.swing.border.EmptyBorder;
 import javax.swing.border.LineBorder;
 import javax.swing.table.DefaultTableModel;
 import java.awt.*;
@@ -29,17 +31,6 @@ import java.util.stream.IntStream;
  * may point to resource like images, pdfs etc.
  */
 public class ResourceDownLoader extends AppFrame {
-
-    private final int KB = 1024;
-    private JTextField txtDest, txtSource;
-    private JButton btnDownload, btnCancel, btnExit;
-    private JTable tblInfo;
-    private String[] emptyRow;
-    private DefaultTableModel model;
-    private Map<String, ResourceInfo> urlsToDownload;
-    private final int DEFAULT_NUM_ROWS = 6;
-    public static final String FAILED_MSG = "Failed !! - ";
-    public static final String CANCELLED_MSG = "Cancelled !! - ";
 
     public enum COLS {
         IDX(0, "#", "center", 50),
@@ -76,11 +67,28 @@ public class ResourceDownLoader extends AppFrame {
         }
     }
 
+    private final int KB = 1024;
+    private JTextField txtDest, txtSource;
+    private JButton btnDownload, btnCancel, btnExit;
+    private JTable tblInfo;
+    private JTextArea txtUrls;
+    private String[] emptyRow;
+    private DefaultTableModel model;
+    private Map<String, ResourceInfo> urlsToDownload;
+    private List<String> urlsFromFile;
+    private final int DEFAULT_NUM_ROWS = 6;
+
     private MyLogger logger = MyLogger.createLogger("resource-downloader.log");
     private DefaultConfigs configs = new DefaultConfigs(logger);
     private TrustManager[] trustAllCerts;
     private final String title = "Resource Downloader";
     private static final ExecutorService threadPool = Executors.newFixedThreadPool(3);
+
+    public static final String FAILED_MSG = "Failed !! - ";
+    public static final String CANCELLED_MSG = "Cancelled !! - ";
+
+    Border borderBlue = new LineBorder(Color.BLUE, 1);
+    Border emptyBorder = new EmptyBorder(new Insets(5, 5, 5, 5));
 
     private void createTrustManager() {
         trustAllCerts = new TrustManager[]{
@@ -150,14 +158,34 @@ public class ResourceDownLoader extends AppFrame {
         controlsPanel.add(btnExit);
 
         createTable();
-        JScrollPane pane = new JScrollPane(tblInfo);
-        pane.setBorder(new LineBorder(Color.WHITE, 5));
+        JScrollPane jspTable = new JScrollPane(tblInfo);
+        jspTable.setBorder(emptyBorder);
+
+        txtUrls = new JTextArea(getUrls(), 5, 1);
+        txtUrls.setBorder(borderBlue);
+        JScrollPane jspUrls = new JScrollPane(txtUrls);
+        jspUrls.setBorder(emptyBorder);
+
+        JPanel jpUrls = new JPanel(new BorderLayout());
+        jpUrls.add(new JLabel(" Urls to download"), BorderLayout.NORTH);
+        jpUrls.add(jspUrls, BorderLayout.CENTER);
+
+        JPanel jpTblAndUrls = new JPanel(new GridLayout(2, 1));
+        jpTblAndUrls.add(jspTable);
+        jpTblAndUrls.add(jpUrls);
 
         parentContainer.add(controlsPanel, BorderLayout.NORTH);
-        parentContainer.add(pane, BorderLayout.CENTER);
+        parentContainer.add(jpTblAndUrls, BorderLayout.CENTER);
 
         setToCenter();
         logger.log("Program initialized");
+    }
+
+    private String getUrls() {
+        urlsFromFile = getUrlsFromFile(txtSource.getText());
+        StringBuilder sb = new StringBuilder();
+        urlsFromFile.forEach(s -> sb.append(s).append(System.lineSeparator()));
+        return sb.toString();
     }
 
     private void createTable() {
@@ -178,7 +206,7 @@ public class ResourceDownLoader extends AppFrame {
         createDefaultRows();
 
         tblInfo = new JTable(model);
-        tblInfo.setBorder(new LineBorder(Color.BLACK, 1));
+        tblInfo.setBorder(borderBlue);
 
         // For making contents non editable
         tblInfo.setDefaultEditor(Object.class, null);
@@ -229,7 +257,7 @@ public class ResourceDownLoader extends AppFrame {
      */
     private void exitForm() {
         cancelDownLoad();
-        configs.saveConfig(this);
+        configs.saveAllConfigs(this);
         logger.log("Goodbye");
         setVisible(false);
         dispose();
@@ -369,13 +397,13 @@ public class ResourceDownLoader extends AppFrame {
 
         if (!isHttpUrl(srcPath)) {
             urlsToDownload.clear();
-            List<String> urlsToDownloadList = getUrlsFromFile(srcPath);
-            if (urlsToDownloadList.isEmpty()) {
+            urlsFromFile = readUrlsFromTextArea();
+            if (urlsFromFile.isEmpty()) {
                 enableControls();
                 updateTitle("No urls to download !!");
             }
             updateTitle("Starting download");
-            urlsToDownloadList.forEach(f -> {
+            urlsFromFile.forEach(f -> {
                 if (Utils.hasValue(f)) {
                     urlsToDownload.put(f, new ResourceInfo(f, this.logger, this));
                 }
@@ -385,6 +413,10 @@ public class ResourceDownLoader extends AppFrame {
 
         createRowsInTable(urlsToDownload);
         threadPool.submit(new StartDownloadCallable(this, urlsToDownload));
+    }
+
+    private List<String> readUrlsFromTextArea() {
+        return Arrays.asList(txtUrls.getText().split(System.lineSeparator()));
     }
 
     private void clearOldRun() {
@@ -593,6 +625,10 @@ public class ResourceDownLoader extends AppFrame {
 
     public String getUrlsToDownload() {
         return txtSource.getText();
+    }
+
+    public String getDownloadingUrls() {
+        return txtUrls.getText();
     }
 
     public String getDownloadLoc() {
