@@ -1,12 +1,8 @@
 package com.sv.downloader;
 
-import com.sv.changefilenames.Utils;
-
-import java.io.BufferedWriter;
-import java.io.FileWriter;
-import java.io.IOException;
-import java.io.Writer;
+import java.io.*;
 import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 
 /**
  * Created by svg on 11-Oct-2017
@@ -42,6 +38,21 @@ public class MyLogger {
     public void finalize() throws Throwable {
         super.finalize();
         dispose();
+    }
+
+    void warn(String message) {
+        log ("WARN: " + message);
+    }
+
+    void error(String message) {
+        log ("ERROR: " + message);
+    }
+
+    void error(Throwable throwable) {
+        StringWriter sw = new StringWriter();
+        throwable.printStackTrace(new PrintWriter(sw));
+        String errorStr = sw.toString();
+        error(errorStr);
     }
 
     /**
@@ -86,6 +97,9 @@ public class MyLogger {
     }
 
     private String getTime() {
-        return "["+LocalDateTime.now()+"]: ";
+        LocalDateTime date = LocalDateTime.now();
+        DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss.S");
+        String text = date.format(formatter);
+        return "["+LocalDateTime.parse(text, formatter)+"]: ";
     }
 }

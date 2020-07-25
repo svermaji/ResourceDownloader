@@ -1,5 +1,6 @@
 package com.sv.downloader;
 
+import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.Properties;
@@ -20,6 +21,7 @@ public class DefaultConfigs {
         }
     }
     private final Properties configs = new Properties();
+    private final String propFileName = "com/sv/downloader/downloader.config";
     private MyLogger logger;
 
     public DefaultConfigs(MyLogger logger) {
@@ -38,7 +40,6 @@ public class DefaultConfigs {
     }
 
     private void readConfig() {
-        String propFileName = "com/sv/downloader/downloader.config";
         try (InputStream is = getClass().getClassLoader().getResourceAsStream(propFileName)) {
             configs.load(is);
         } catch (IOException e) {
@@ -46,4 +47,16 @@ public class DefaultConfigs {
         }
     }
 
+    public void saveConfig(ResourceDownLoader rsd) {
+        logger.log ("Saving properties.");
+        configs.clear();
+        configs.put(Config.DOWNLOAD_LOC.getVal(), rsd.getDownloadLoc());
+        configs.put(Config.URLS_TO_DOWNLOAD.getVal(), rsd.getUrlsToDownload());
+        logger.log ("Config is " + configs);
+        try {
+            configs.store(new FileOutputStream(propFileName), null);
+        } catch (IOException e) {
+            logger.log ("Error in saving properties.");
+        }
+    }
 }

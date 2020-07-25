@@ -4,6 +4,7 @@ import java.util.concurrent.TimeUnit;
 
 class FileInfo {
     private final String src, dest;
+    private String filename = null;
     private final long size;
     private long downloadedSize;
     private long downloadStartTime;
@@ -22,6 +23,14 @@ class FileInfo {
 
     public String getDest() {
         return dest;
+    }
+
+    public void setFilename(String filename) {
+        this.filename = filename;
+    }
+
+    public String getFilename() {
+        return filename;
     }
 
     public long getSize() {

@@ -4,6 +4,7 @@ public enum FileStatus {
 
     DOWNLOADING("downloading"),
     IN_QUEUE("in queue"),
+    FAILED("failed"),
     DOWNLOADED("downloaded"),
     CANCELLED("cancelled");
 

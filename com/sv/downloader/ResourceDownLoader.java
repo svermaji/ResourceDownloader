@@ -10,10 +10,8 @@ import javax.swing.table.DefaultTableModel;
 import java.awt.*;
 import java.awt.event.WindowAdapter;
 import java.awt.event.WindowEvent;
-import java.io.FileOutputStream;
-import java.io.IOException;
-import java.net.URL;
-import java.net.URLConnection;
+import java.io.*;
+import java.net.*;
 import java.nio.channels.Channels;
 import java.nio.channels.ReadableByteChannel;
 import java.nio.file.Files;
@@ -40,6 +38,8 @@ public class ResourceDownLoader extends AppFrame {
     private DefaultTableModel model;
     private Map<String, ResourceInfo> urlsToDownload;
     private final int DEFAULT_NUM_ROWS = 6;
+    public static final String FAILED_MSG = "Failed !! - ";
+    public static final String CANCELLED_MSG = "Cancelled !! - ";
 
     public enum COLS {
         IDX(0, "#", "center", 50),
@@ -76,7 +76,8 @@ public class ResourceDownLoader extends AppFrame {
         }
     }
 
-    private MyLogger logger;
+    private MyLogger logger = MyLogger.createLogger("resource-downloader.log");
+    private DefaultConfigs configs = new DefaultConfigs(logger);
     private TrustManager[] trustAllCerts;
     private final String title = "Resource Downloader";
     private static final ExecutorService threadPool = Executors.newFixedThreadPool(3);
@@ -109,9 +110,7 @@ public class ResourceDownLoader extends AppFrame {
 
         createTrustManager();
         trustAllHttps();
-        logger = MyLogger.createLogger("resource-downloader.log");
         urlsToDownload = new HashMap<>();
-        DefaultConfigs configs = new DefaultConfigs(logger);
 
         Container parentContainer = getContentPane();
         JPanel controlsPanel = new JPanel();
@@ -215,8 +214,7 @@ public class ResourceDownLoader extends AppFrame {
             sc.init(null, trustAllCerts, new java.security.SecureRandom());
             HttpsURLConnection.setDefaultSSLSocketFactory(sc.getSocketFactory());
         } catch (Exception e) {
-            logger.log(e.getMessage());
-            e.printStackTrace();
+            logger.error(e);
         }
     }
 
@@ -231,6 +229,7 @@ public class ResourceDownLoader extends AppFrame {
      */
     private void exitForm() {
         cancelDownLoad();
+        configs.saveConfig(this);
         logger.log("Goodbye");
         setVisible(false);
         dispose();
@@ -251,14 +250,17 @@ public class ResourceDownLoader extends AppFrame {
     private void downLoad(ResourceInfo resourceInfo) {
         String url = resourceInfo.getUrl();
         logger.log("Trying url [" + url + "]");
+        ReadableByteChannel rbc = null;
+        FileOutputStream fos = null;
+        FileInfo fileInfo = null;
         try {
             URL u = new URL(url);
             URLConnection uc = u.openConnection();
-            FileInfo fileInfo = new FileInfo(url, getDestPath(url), uc.getContentLength(), System.currentTimeMillis());
+            fileInfo = new FileInfo(url, getDestPath(url), uc.getContentLength(), System.currentTimeMillis());
             logger.log("Url resource size is [" + fileInfo.getSize() + "] Bytes i.e. [" + (fileInfo.getSize() / KB) + "] KB");
 
-            ReadableByteChannel rbc = Channels.newChannel(u.openStream());
-            FileOutputStream fos = new FileOutputStream(fileInfo.getDest());
+            rbc = Channels.newChannel(u.openStream());
+            fos = getFOS(fileInfo, resourceInfo.getRowNum());
             resourceInfo.updateResourceInfo(fos, rbc, fileInfo);
 
             // ignoring boolean status from Callable
@@ -266,8 +268,57 @@ public class ResourceDownLoader extends AppFrame {
             startTracking(resourceInfo);
 
         } catch (Exception e) {
-            logger.log(e.getMessage());
-            e.printStackTrace();
+            logger.error(e);
+            markDownloadFailed(fileInfo.getSrc(), resourceInfo.getRowNum());
+        }
+    }
+
+    private FileOutputStream getFOS(FileInfo fileInfo, int row) throws Exception {
+        try {
+            return new FileOutputStream(fileInfo.getDest());
+        } catch (Exception e) {
+            logger.warn("Destination [" + fileInfo.getDest() + "] does not have name.  Trying from url itself");
+        }
+        return getFOSFromUrl(fileInfo, row);
+    }
+
+    private FileOutputStream getFOSFromUrl(FileInfo fileInfo, int row) throws Exception {
+        URLConnection conn = new URL(fileInfo.getSrc()).openConnection();
+        String disposition = conn.getHeaderField("Content-disposition");
+        fileInfo.setFilename(getDestPathForName(extractFileNameFromCD(disposition)));
+
+        updateFileNameInTable(fileInfo, row);
+        return new FileOutputStream(fileInfo.getFilename());
+    }
+
+    private String extractFileNameFromCD(String cdStr) {
+        logger.log("Content disposition from url obtained as [" + cdStr + "]");
+        String FN_STR = "filename=\"";
+        if (cdStr.contains(FN_STR)) {
+            cdStr = cdStr.substring(cdStr.indexOf(FN_STR) + FN_STR.length());
+            if (cdStr.contains("\"")) {
+                cdStr = cdStr.substring(0, cdStr.indexOf("\""));
+            }
+        }
+        logger.log("Returning name extracted from content disposition as [" + cdStr + "]");
+        return cdStr;
+    }
+
+    public void markDownloadFailed(String src, int row) {
+        markDownloadForError(src, FAILED_MSG, row);
+    }
+
+    public void markDownloadCancelled(String src, int row) {
+        markDownloadForError(src, CANCELLED_MSG, row);
+    }
+
+    private void markDownloadForError(String src, String msg, int i) {
+        logger.log("Marking cancel for " + src);
+        if (isPathMatched(src, i)) {
+            if (!tblInfo.getValueAt(i, COLS.NAME.getIdx()).toString().startsWith(FAILED_MSG) &&
+                    !tblInfo.getValueAt(i, COLS.NAME.getIdx()).toString().startsWith(CANCELLED_MSG)) {
+                tblInfo.setValueAt(msg + tblInfo.getValueAt(i, COLS.NAME.getIdx()), i, COLS.NAME.getIdx());
+            }
         }
     }
 
@@ -281,11 +332,18 @@ public class ResourceDownLoader extends AppFrame {
     }
 
     private String getDestPath(String url) {
+        return getDestPathForName(url.substring(url.lastIndexOf("/")));
+    }
+
+    private String getDestPathForName(String name) {
         String destFolder = txtDest.getText();
         if (!Utils.hasValue(destFolder)) {
             destFolder = ".";
         }
-        String path = destFolder + url.substring(url.lastIndexOf("/"));
+        if (!name.startsWith("\\") || !name.startsWith("/")) {
+            name = "\\" + name;
+        }
+        String path = destFolder + name;
         logger.log("Destination path is [" + path + "]");
         return path;
     }
@@ -307,14 +365,19 @@ public class ResourceDownLoader extends AppFrame {
 
         disableControls();
         clearOldRun();
-        urlsToDownload.put(srcPath, new ResourceInfo(srcPath, this.logger));
+        urlsToDownload.put(srcPath, new ResourceInfo(srcPath, this.logger, this));
 
         if (!isHttpUrl(srcPath)) {
             urlsToDownload.clear();
             List<String> urlsToDownloadList = getUrlsFromFile(srcPath);
+            if (urlsToDownloadList.isEmpty()) {
+                enableControls();
+                updateTitle("No urls to download !!");
+            }
+            updateTitle("Starting download");
             urlsToDownloadList.forEach(f -> {
                 if (Utils.hasValue(f)) {
-                    urlsToDownload.put(f, new ResourceInfo(f, this.logger));
+                    urlsToDownload.put(f, new ResourceInfo(f, this.logger, this));
                 }
             });
         }
@@ -322,7 +385,6 @@ public class ResourceDownLoader extends AppFrame {
 
         createRowsInTable(urlsToDownload);
         threadPool.submit(new StartDownloadCallable(this, urlsToDownload));
-//        urlsToDownload.forEach((k, v) -> downLoad(v));
     }
 
     private void clearOldRun() {
@@ -336,6 +398,7 @@ public class ResourceDownLoader extends AppFrame {
         int i = 0;
         for (Map.Entry<String, ResourceInfo> entry : urlsToDownload.entrySet()) {
             String k = entry.getKey();
+            entry.getValue().setRowNum(i);
             if (i < DEFAULT_NUM_ROWS) {
                 tblInfo.setValueAt(i + 1, i, COLS.IDX.getIdx());
                 tblInfo.setValueAt(k, i, COLS.PATH.getIdx());
@@ -370,8 +433,7 @@ public class ResourceDownLoader extends AppFrame {
         try {
             return Files.readAllLines(path);
         } catch (IOException e) {
-            logger.log(e.getMessage());
-            e.printStackTrace();
+            logger.error(e);
             return new ArrayList<>();
         }
     }
@@ -384,13 +446,15 @@ public class ResourceDownLoader extends AppFrame {
         public DownloadFileCallable(ResourceDownLoader rd, ResourceInfo resourceInfo) {
             this.rd = rd;
             this.resourceInfo = resourceInfo;
+            if (!resourceInfo.isCancelled()) {
+                resourceInfo.setFileStatus(FileStatus.DOWNLOADING);
+            }
         }
 
         @Override
         public Boolean call() throws Exception {
             long startTime = System.currentTimeMillis();
 
-            resourceInfo.setFileStatus(FileStatus.DOWNLOADING);
             rd.logger.log("Starting download for " + resourceInfo);
             resourceInfo.getFos().getChannel().transferFrom
                     (resourceInfo.getRbc(), 0, resourceInfo.getFileInfo().getSize());
@@ -399,7 +463,7 @@ public class ResourceDownLoader extends AppFrame {
                 long diffTimeInSec = TimeUnit.MILLISECONDS.toSeconds(diffTime);
                 resourceInfo.getFileInfo().setDownloadInSec(diffTimeInSec);
                 rd.logger.log("download complete for " + resourceInfo);
-                rd.updateDownloadTime(resourceInfo.getUrl(), diffTimeInSec);
+                rd.updateDownloadTime(resourceInfo.getFileInfo(), diffTimeInSec, resourceInfo.getRowNum());
             }
             resourceInfo.markDownload();
             rd.enableControls();
@@ -433,6 +497,7 @@ public class ResourceDownLoader extends AppFrame {
         private final ResourceDownLoader rd;
 
         DownloadStatusCallable(ResourceDownLoader rd, ResourceInfo resourceInfo) {
+            rd.logger.log("Download status tracking start for " + resourceInfo.getUrl());
             this.resourceInfo = resourceInfo;
             this.fileInfo = resourceInfo.getFileInfo();
             this.rd = rd;
@@ -440,7 +505,7 @@ public class ResourceDownLoader extends AppFrame {
 
         @Override
         public Boolean call() throws Exception {
-            int percent, KB = 1024;
+            int percent = 0, KB = 1024;
             long lastSize = 0, fileSize = fileInfo.getSize();
             String speedStr;
             StringBuilder sbLogInfo;
@@ -451,7 +516,8 @@ public class ResourceDownLoader extends AppFrame {
                     rd.logger.log(sbLogInfo.toString());
                     break;
                 }
-                long size = Files.size(Utils.createPath(fileInfo.getDest()));
+                String dest = Utils.hasValue(fileInfo.getFilename()) ? fileInfo.getFilename() : fileInfo.getDest();
+                long size = Files.size(Utils.createPath(dest));
                 sbLogInfo.append(", Downloaded size [").append(size).append("/").append(fileSize).append("]");
                 percent = (int) ((size * 100) / fileSize);
                 resourceInfo.getFileInfo().setDownloadedSize(size);
@@ -473,32 +539,38 @@ public class ResourceDownLoader extends AppFrame {
                 rd.updateTitle(percent + "% at [" + speedStr + "]");
                 rd.logger.log(sbLogInfo.toString());
 
-                rd.updateFileStatus(fileInfo, percent);
+                rd.updateFileStatus(fileInfo, percent, resourceInfo.getRowNum());
 
                 Thread.sleep(250);
             } while (percent < 100);
 
             return true;
         }
+
     }
 
-    private void updateDownloadTime(String src, long time) {
-        for (int i = 0; i < tblInfo.getRowCount(); i++) {
-            if (tblInfo.getValueAt(i, COLS.NAME.getIdx()).equals(Utils.getFileName(src))) {
-                tblInfo.setValueAt(time, i, COLS.TIME.getIdx());
-            }
+    private void updateDownloadTime(FileInfo fileInfo, long time, int i) {
+        if (isPathMatched(fileInfo.getSrc(), i)) {
+            tblInfo.setValueAt(time, i, COLS.TIME.getIdx());
         }
     }
 
-    private void updateFileStatus(FileInfo fileInfo, int percent) {
-        String src = fileInfo.getSrc();
-        for (int i = 0; i < tblInfo.getRowCount(); i++) {
-            if (tblInfo.getValueAt(i, COLS.NAME.getIdx()).equals(Utils.getFileName(src))) {
-                tblInfo.setValueAt(percent, i, COLS.PERCENT.getIdx());
-                tblInfo.setValueAt(getDownloadSize(fileInfo), i, COLS.SIZE.getIdx());
-                tblInfo.setValueAt(getDownloadTime(fileInfo), i, COLS.TIME.getIdx());
-            }
+    private void updateFileStatus(FileInfo fileInfo, int percent, int i) {
+        if (isPathMatched(fileInfo.getSrc(), i)) {
+            tblInfo.setValueAt(percent, i, COLS.PERCENT.getIdx());
+            tblInfo.setValueAt(getDownloadSize(fileInfo), i, COLS.SIZE.getIdx());
+            tblInfo.setValueAt(getDownloadTime(fileInfo), i, COLS.TIME.getIdx());
         }
+    }
+
+    private void updateFileNameInTable(FileInfo fileInfo, int i) {
+        if (isPathMatched(fileInfo.getSrc(), i)) {
+            tblInfo.setValueAt(Utils.getFileNameForLocal(fileInfo.getFilename()), i, COLS.NAME.getIdx());
+        }
+    }
+
+    private boolean isPathMatched(String src, int row) {
+        return tblInfo.getValueAt(row, COLS.PATH.getIdx()).toString().equals(src);
     }
 
     private String getDownloadSize(FileInfo fileInfo) {
@@ -518,5 +590,14 @@ public class ResourceDownLoader extends AppFrame {
     private String getDownloadTime(FileInfo fileInfo) {
         return fileInfo.getDownloadInSec() + "";
     }
+
+    public String getUrlsToDownload() {
+        return txtSource.getText();
+    }
+
+    public String getDownloadLoc() {
+        return txtDest.getText();
+    }
+
 }
 

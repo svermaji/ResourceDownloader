@@ -149,6 +149,14 @@ public class Utils {
         return url;
     }
 
+    public static String getFileNameForLocal(String url) {
+        if (!hasValue(url))
+            return "";
+        if (url.contains("\\"))
+            return url.substring(url.lastIndexOf("\\")+1);
+        return url;
+    }
+
     public static void sleep (long millis) {
         try {
             Thread.sleep(millis);

@@ -9,15 +9,18 @@ public class ResourceInfo {
     private ReadableByteChannel rbc;
     private FileInfo fileInfo;
     private FileStatus fileStatus;
+    private int rowNum;
     private static MyLogger logger;
     private final String url;
+    private ResourceDownLoader rdl;
 
-    public ResourceInfo(String url, MyLogger myLogger) {
+    public ResourceInfo(String url, MyLogger myLogger, ResourceDownLoader rdl) {
         this.url = url;
         if (logger == null) {
             logger = myLogger;
         }
         fileStatus = FileStatus.IN_QUEUE;
+        this.rdl = rdl;
     }
 
     public void updateResourceInfo(FileOutputStream fos, ReadableByteChannel rbc, FileInfo fileInfo) {
@@ -28,6 +31,14 @@ public class ResourceInfo {
         this.fos = fos;
         this.rbc = rbc;
         this.fileInfo = fileInfo;
+    }
+
+    public int getRowNum() {
+        return rowNum;
+    }
+
+    public void setRowNum(int rowNum) {
+        this.rowNum = rowNum;
     }
 
     public FileInfo getFileInfo() {
@@ -55,8 +66,10 @@ public class ResourceInfo {
     }
 
     public void closeResource() {
-        if (fileStatus.equals(FileStatus.DOWNLOADING)) {
+        if (!fileStatus.equals(FileStatus.DOWNLOADED) && !fileStatus.equals(FileStatus.FAILED)) {
+            logger.log("Marking status cancel for " + getUrl());
             fileStatus = FileStatus.CANCELLED;
+            rdl.markDownloadCancelled(getUrl(), rowNum) ;
         }
         if (fos != null) {
             try {
@@ -68,7 +81,7 @@ public class ResourceInfo {
                 fos = null;
                 rbc = null;
             } catch (IOException e) {
-                e.printStackTrace();
+                logger.error(e);
             }
         }
     }
