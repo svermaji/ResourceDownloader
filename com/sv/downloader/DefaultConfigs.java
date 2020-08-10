@@ -3,6 +3,9 @@ package com.sv.downloader;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.net.URL;
+import java.nio.file.Files;
+import java.nio.file.Paths;
 import java.util.Properties;
 
 public class DefaultConfigs {
@@ -21,8 +24,9 @@ public class DefaultConfigs {
         }
     }
     private final Properties configs = new Properties();
-    private final String propFileName = "com/sv/downloader/downloader.config";
-    private MyLogger logger;
+    private final String propFileName = "./conf.config";
+    private final MyLogger logger;
+    private URL propUrl;
 
     public DefaultConfigs(MyLogger logger) {
         this.logger = logger;
@@ -40,10 +44,37 @@ public class DefaultConfigs {
     }
 
     private void readConfig() {
-        try (InputStream is = getClass().getClassLoader().getResourceAsStream(propFileName)) {
+        logger.log ("Loading properties from path: " + propFileName);
+        try (InputStream is = Files.newInputStream(Paths.get(propFileName))) {
+            propUrl = Paths.get(propFileName).toUri().toURL();
             configs.load(is);
+        } catch (Exception e) {
+            logger.log ("Error in loading properties via file path, trying class loader. Message: " + e.getMessage());
+            try (InputStream is = getClass().getClassLoader().getResourceAsStream(propFileName)) {
+                propUrl = Paths.get(propFileName).toUri().toURL();
+                configs.load(is);
+            } catch (IOException ioe) {
+                logger.log ("Error in loading properties via class loader. Message: " + ioe.getMessage());
+            } catch (RuntimeException exp) {
+                logger.log ("Error in loading properties. Message: " + exp.getMessage());
+            }
+        }
+        logger.log ("Prop url calculated as: " + propUrl);
+    }
+
+    public void saveAllConfigs(ResourceDownLoader rsd) {
+        saveConfig(rsd);
+        saveUrls(rsd);
+    }
+
+    private void saveUrls(ResourceDownLoader rsd) {
+        logger.log ("Saving urls.");
+        try {
+            FileOutputStream fos = new FileOutputStream(rsd.getUrlsToDownload());
+            fos.write(rsd.getDownloadingUrls().getBytes());
         } catch (IOException e) {
-            logger.log ("Error in loading properties.");
+            logger.error ("Error in saving urls.");
+            logger.error (e);
         }
     }
 

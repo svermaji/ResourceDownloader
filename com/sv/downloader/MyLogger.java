@@ -27,17 +27,12 @@ public class MyLogger {
     private MyLogger() {
     }
 
-    private void dispose() {
+    public void dispose() {
         try {
             logWriter.close();
         } catch (IOException e) {
             e.printStackTrace();
         }
-    }
-
-    public void finalize() throws Throwable {
-        super.finalize();
-        dispose();
     }
 
     void warn(String message) {

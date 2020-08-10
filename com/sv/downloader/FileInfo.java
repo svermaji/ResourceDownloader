@@ -7,14 +7,13 @@ class FileInfo {
     private String filename = null;
     private final long size;
     private long downloadedSize;
-    private long downloadStartTime;
+    private long downloadStartTime = 0;
     private long downloadInSec;
 
-    FileInfo(String src, String dest, int size, long downloadStartTime) {
+    FileInfo(String src, String dest, int size) {
         this.src = src;
         this.dest = dest;
         this.size = size;
-        this.downloadStartTime = downloadStartTime;
     }
 
     public String getSrc() {
@@ -39,6 +38,12 @@ class FileInfo {
 
     public long getDownloadStartTime() {
         return downloadStartTime;
+    }
+
+    public void setDownloadStartTime(long downloadStartTime) {
+        if (this.downloadStartTime == 0) {
+            this.downloadStartTime = downloadStartTime;
+        }
     }
 
     public long getDownloadInSec() {

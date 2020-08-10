@@ -1,6 +1,10 @@
 # ResourceDownloader
 Utility in Java 8+ to download files from internet or any public available url.
 
+###### Update on 10-Aug-2020<br>
+ - Update config file and dispose method
+ - Update logger and download timer
+ 
 ## Usage<br>
 `javac ResourceDownloader <url> <destination>`<br>
 where
