@@ -14,8 +14,13 @@ where
 This program also provides UI that gives option to put url and destination folder.
 Once download starts, UI shows the progress of each file and internet speed.
 
+Configurations and Urls will be auto-stored to config files and will be reloaded on start up.
+
 Attaching screen shot:
 ![Image of Yaktocat](https://github.com/svermaji/ResourceDownloader/blob/master/rd.png) 
 
 Attaching screen shot with progress bar changes:
 ![Image of Yaktocat](https://github.com/svermaji/ResourceDownloader/blob/master/rd-progress-bars.png) 
+
+Attaching screen shot with progress bar and text area changes:
+![Image of Yaktocat](https://github.com/svermaji/ResourceDownloader/blob/master/rd-table-and-textarea.png) 
