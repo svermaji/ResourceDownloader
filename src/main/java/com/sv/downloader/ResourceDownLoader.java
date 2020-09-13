@@ -20,10 +20,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
 import java.util.*;
-import java.util.concurrent.Callable;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.concurrent.TimeUnit;
+import java.util.concurrent.*;
 import java.util.stream.IntStream;
 
 /**
@@ -83,7 +80,7 @@ public class ResourceDownLoader extends AppFrame {
     private final DefaultConfigs configs = new DefaultConfigs(logger);
     private TrustManager[] trustAllCerts;
     private final String title = "Resource Downloader";
-    private static final ExecutorService threadPool = Executors.newFixedThreadPool(3);
+    private static final ExecutorService threadPool = Executors.newFixedThreadPool(5);
 
     public static final String FAILED_MSG = "Failed !! - ";
     public static final String CANCELLED_MSG = "Cancelled !! - ";
@@ -130,7 +127,9 @@ public class ResourceDownLoader extends AppFrame {
         txtSource = new JTextField();
         JLabel lblSource = new AppLabel("Download from", txtSource, 'F');
         btnDownload = new AppButton("DownLoad", 'D');
-        btnOpenDest = new AppButton("Open Destination", 'O');
+        btnOpenDest = new AppButton("Open", 'O');
+        btnOpenDest.setIcon(new ImageIcon("./open.png"));
+        btnOpenDest.setToolTipText("Open Destination");
         btnOpenDest.addActionListener(e -> {
             try {
                 Runtime.getRuntime().exec("explorer.exe \"" + txtDest.getText() + "\"");
@@ -159,6 +158,7 @@ public class ResourceDownLoader extends AppFrame {
 
         controlsPanel.add(lblDest);
         controlsPanel.add(txtDest);
+        controlsPanel.add(btnOpenDest);
         btnDownload.addActionListener(evt -> startDownLoad(txtSource.getText()));
         controlsPanel.add(btnDownload);
         btnCancel.addActionListener(evt -> cancelDownLoad());
@@ -292,6 +292,8 @@ public class ResourceDownLoader extends AppFrame {
         FileOutputStream fos;
         FileInfo fileInfo;
         try {
+            logger.log("Starting overall tracking...");
+            threadPool.submit(new TrackAllDownloadsCallable(this));
             URL u = new URL(url);
             URLConnection uc = u.openConnection();
             fileInfo = new FileInfo(url, extractPath(url), uc.getContentLength());
@@ -300,6 +302,7 @@ public class ResourceDownLoader extends AppFrame {
             if (checkIfExists (fileInfo)) {
                 resourceInfo.setFileStatus(FileStatus.EXISTS);
                 setStatusCellValue(FileStatus.EXISTS.getVal(), resourceInfo.getRowNum());
+                urlsToDownload.remove(resourceInfo.getUrl());
             } else {
                 rbc = Channels.newChannel(u.openStream());
                 fos = getFOS(fileInfo, resourceInfo.getRowNum());
@@ -363,21 +366,35 @@ public class ResourceDownLoader extends AppFrame {
         int i = info.getRowNum();
         if (isPathMatched(info.getUrl(), i)) {
             String nameVal = tblInfo.getValueAt(i, COLS.NAME.getIdx()).toString();
-            if (!nameVal.startsWith(FAILED_MSG) && !nameVal.startsWith(CANCELLED_MSG)) {
-                setCellValue (msg + tblInfo.getValueAt(i, COLS.NAME.getIdx()), i, COLS.NAME.getIdx());
+            if (canCancel(info.getFileStatus().getVal()) &&
+                    !nameVal.startsWith(CANCELLED_MSG) &&
+                    !nameVal.startsWith(FAILED_MSG)
+            ) {
+                setCellValue (msg + nameVal, i, COLS.NAME.getIdx());
             }
             setStatusCellValue (info.getFileStatus().getVal(), i);
+
+            if (canCancel(info.getFileStatus().getVal())) {
+                try {
+                    logger.log("Trying to delete cancelled url: " + info.getUrl());
+                    Files.deleteIfExists(Utils.createPath(info.getFileInfo().getDest()));
+                } catch (IOException e) {
+                    logger.error("Unable to delete cancelled file: " + info.getUrl());
+                }
+            }
         }
     }
 
     private void setStatusCellValue(String val, int row) {
         int col = COLS.STATUS.getIdx();
-        String presentVal = tblInfo.getValueAt(row, col).toString();
-        if (!presentVal.equals(FileStatus.CANCELLED.getVal()) &&
-            !presentVal.equals(FileStatus.DOWNLOADED.getVal()) &&
-            !presentVal.equals(FileStatus.EXISTS.getVal())) {
+        if (canCancel (tblInfo.getValueAt(row, col).toString())) {
             setCellValue(val, row, col);
         }
+    }
+
+    private boolean canCancel(String status) {
+        return !status.equals(FileStatus.DOWNLOADED.getVal()) &&
+                !status.equals(FileStatus.EXISTS.getVal());
     }
 
     private void setCellValue(long val, int row, int col) {
@@ -417,9 +434,9 @@ public class ResourceDownLoader extends AppFrame {
     }
 
     private void cancelDownLoad() {
+        disableCancelButton();
         if (!urlsToDownload.isEmpty()) {
-            logger.log("Cancelling all downloads...");
-
+            logger.log("Cancelling all downloads. Remaining downloads: " + urlsToDownload.size());
             urlsToDownload.forEach((u, ri) -> ri.closeResource());
             urlsToDownload.clear();
             enableControls();
@@ -427,6 +444,15 @@ public class ResourceDownLoader extends AppFrame {
 
             logger.log("Cancelling done.");
         }
+        enableCancelButton();
+    }
+
+    private void enableCancelButton() {
+        btnCancel.setEnabled(true);
+    }
+
+    private void disableCancelButton() {
+        btnCancel.setEnabled(false);
     }
 
     private void startDownLoad(String srcPath) {
@@ -543,7 +569,7 @@ public class ResourceDownLoader extends AppFrame {
                 rd.updateDownloadTime(resourceInfo.getFileInfo(), diffTimeInSec, resourceInfo.getRowNum());
             }
             resourceInfo.markDownload();
-            rd.enableControls();
+            rd.urlsToDownload.remove(resourceInfo.getUrl());
 
             return true;
         }
@@ -613,6 +639,26 @@ public class ResourceDownLoader extends AppFrame {
                 Thread.sleep(250);
             } while (percent < 100);
 
+            return true;
+        }
+
+    }
+
+    static class TrackAllDownloadsCallable implements Callable<Boolean> {
+
+        private final ResourceDownLoader rd;
+
+        TrackAllDownloadsCallable(ResourceDownLoader rd) {
+            this.rd = rd;
+        }
+
+        @Override
+        public Boolean call() throws Exception {
+            do {
+                Thread.sleep(2000);
+            } while (!rd.urlsToDownload.isEmpty());
+
+            rd.enableControls();
             return true;
         }
 
