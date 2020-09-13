@@ -50,6 +50,13 @@ public class MyLogger {
         error(errorStr);
     }
 
+    void error(String msg, Throwable throwable) {
+        StringWriter sw = new StringWriter();
+        throwable.printStackTrace(new PrintWriter(sw));
+        String errorStr = sw.toString();
+        error(msg + errorStr);
+    }
+
     /**
      * Writes the debug statement in log file.
      * If log file could not be initialized

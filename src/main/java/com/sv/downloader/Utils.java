@@ -13,6 +13,7 @@ public class Utils {
     public static final String DOUBLE_SPACE = SPACE+SPACE;
     public static final String DASH = "-";
     public static final String SP_DASH_SP = SPACE + DASH + SPACE;
+    public static final String FW_SLASH = "/";
 
     // Set of values that imply a true value.
     private static final String[] trueValues = {"Y", "YES", "TRUE", "T"};
@@ -163,5 +164,24 @@ public class Utils {
         } catch (InterruptedException e) {
             e.printStackTrace();
         }
+    }
+
+    public static String getFileSizeString(long fs) {
+        long KB = 1024;
+        float inKB = (float) fs/KB;
+        float inMB = inKB/KB;
+        float inGB = inMB/KB;
+        if (inGB > 1) {
+            return String.format("[%sGB]", formatFloat (inGB));
+        } else if (inMB > 1) {
+            return String.format("[%sMB]", formatFloat (inMB));
+        } else if (inKB > 1) {
+            return String.format("[%sKB]", formatFloat (inKB));
+        }
+        return String.format("[%sBytes]", fs);
+    }
+
+    private static String formatFloat(float size) {
+        return String.format("%.2f", size);
     }
 }

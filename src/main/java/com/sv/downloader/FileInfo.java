@@ -6,9 +6,9 @@ class FileInfo {
     private final String src, dest;
     private String filename = null;
     private final long size;
-    private long downloadedSize;
+    private long downloadedSize = 0;
     private long downloadStartTime = 0;
-    private long downloadInSec;
+    private long downloadInSec = 0;
 
     FileInfo(String src, String dest, int size) {
         this.src = src;

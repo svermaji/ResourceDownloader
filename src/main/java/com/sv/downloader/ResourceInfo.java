@@ -66,10 +66,10 @@ public class ResourceInfo {
     }
 
     public void closeResource() {
-        if (!fileStatus.equals(FileStatus.DOWNLOADED) && !fileStatus.equals(FileStatus.FAILED)) {
+        if (canMarkCancelled (fileStatus)) {
             logger.log("Marking status cancel for " + getUrl());
             fileStatus = FileStatus.CANCELLED;
-            rdl.markDownloadCancelled(getUrl(), rowNum) ;
+            rdl.markDownloadCancelled(this) ;
         }
         if (fos != null) {
             try {
@@ -84,6 +84,10 @@ public class ResourceInfo {
                 logger.error(e);
             }
         }
+    }
+
+    private boolean canMarkCancelled(FileStatus fileStatus) {
+        return !fileStatus.equals(FileStatus.DOWNLOADED) && !fileStatus.equals(FileStatus.FAILED);
     }
 
     public void markDownload() {
@@ -104,6 +108,10 @@ public class ResourceInfo {
 
     public boolean isCancelled() {
         return fileStatus.equals(FileStatus.CANCELLED);
+    }
+
+    public boolean exists() {
+        return fileStatus.equals(FileStatus.EXISTS);
     }
 }
 

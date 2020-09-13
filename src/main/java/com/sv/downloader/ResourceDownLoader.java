@@ -36,9 +36,10 @@ public class ResourceDownLoader extends AppFrame {
         IDX(0, "#", "center", 50),
         PATH(1, "Path", "left", 0),
         NAME(2, "Name", "left", -1),
-        PERCENT(3, "Percent", "left", 100),
-        SIZE(4, "Size", "center", 150),
-        TIME(5, "Time in sec", "center", 100);
+        STATUS(3, "Status", "center", 100),
+        PERCENT(4, "Percent", "left", 100),
+        SIZE(5, "Size", "center", 150),
+        TIME(6, "Time in sec", "center", 100);
 
         String name, alignment;
         int idx, width;
@@ -69,7 +70,7 @@ public class ResourceDownLoader extends AppFrame {
 
     private final int KB = 1024;
     private JTextField txtDest, txtSource;
-    private JButton btnDownload, btnCancel, btnExit;
+    private JButton btnDownload, btnOpenDest, btnCancel, btnExit;
     private JTable tblInfo;
     private JTextArea txtUrls;
     private String[] emptyRow;
@@ -78,8 +79,8 @@ public class ResourceDownLoader extends AppFrame {
     private List<String> urlsFromFile;
     private final int DEFAULT_NUM_ROWS = 6;
 
-    private MyLogger logger = MyLogger.createLogger("resource-downloader.log");
-    private DefaultConfigs configs = new DefaultConfigs(logger);
+    private final MyLogger logger = MyLogger.createLogger("resource-downloader.log");
+    private final DefaultConfigs configs = new DefaultConfigs(logger);
     private TrustManager[] trustAllCerts;
     private final String title = "Resource Downloader";
     private static final ExecutorService threadPool = Executors.newFixedThreadPool(3);
@@ -126,14 +127,22 @@ public class ResourceDownLoader extends AppFrame {
         parentContainer.setLayout(new BorderLayout());
         setTitle(title);
 
-        JLabel lblSource = new JLabel("Download from");
         txtSource = new JTextField();
-        btnDownload = new JButton("DownLoad");
-        btnCancel = new JButton("Cancel");
-        btnExit = new JButton("Exit");
-        JLabel lblDest = new JLabel("Location To Save");
+        JLabel lblSource = new AppLabel("Download from", txtSource, 'F');
+        btnDownload = new AppButton("DownLoad", 'D');
+        btnOpenDest = new AppButton("Open Destination", 'O');
+        btnOpenDest.addActionListener(e -> {
+            try {
+                Runtime.getRuntime().exec("explorer.exe \"" + txtDest.getText() + "\"");
+            } catch (IOException ioException) {
+                logger.error("Unable to open folder " + txtDest.getText());
+            }
+        });
+        btnCancel = new AppButton("Cancel", 'C');
+        btnExit = new AppExitButton();
         txtDest = new JTextField(configs.getConfig(DefaultConfigs.Config.DOWNLOAD_LOC));
-        txtDest.setColumns(20);
+        JLabel lblDest = new AppLabel("Location To Save", txtDest, 'N');
+        txtDest.setColumns(10);
 
         controlsPanel.setLayout(new FlowLayout());
 
@@ -279,34 +288,42 @@ public class ResourceDownLoader extends AppFrame {
     private void downLoad(ResourceInfo resourceInfo) {
         String url = resourceInfo.getUrl();
         logger.log("Trying url [" + url + "]");
-        ReadableByteChannel rbc = null;
-        FileOutputStream fos = null;
-        FileInfo fileInfo = null;
+        ReadableByteChannel rbc;
+        FileOutputStream fos;
+        FileInfo fileInfo;
         try {
             URL u = new URL(url);
             URLConnection uc = u.openConnection();
-            fileInfo = new FileInfo(url, getDestPath(url), uc.getContentLength());
+            fileInfo = new FileInfo(url, extractPath(url), uc.getContentLength());
             logger.log("Url resource size is [" + fileInfo.getSize() + "] Bytes i.e. [" + (fileInfo.getSize() / KB) + "] KB");
 
-            rbc = Channels.newChannel(u.openStream());
-            fos = getFOS(fileInfo, resourceInfo.getRowNum());
-            resourceInfo.updateResourceInfo(fos, rbc, fileInfo);
+            if (checkIfExists (fileInfo)) {
+                resourceInfo.setFileStatus(FileStatus.EXISTS);
+                setStatusCellValue(FileStatus.EXISTS.getVal(), resourceInfo.getRowNum());
+            } else {
+                rbc = Channels.newChannel(u.openStream());
+                fos = getFOS(fileInfo, resourceInfo.getRowNum());
+                resourceInfo.updateResourceInfo(fos, rbc, fileInfo);
 
-            // ignoring boolean status from Callable
-            threadPool.submit(new DownloadFileCallable(this, resourceInfo));
-            startTracking(resourceInfo);
-
+                // ignoring boolean status from Callable
+                threadPool.submit(new DownloadFileCallable(this, resourceInfo));
+                startTracking(resourceInfo);
+            }
         } catch (Exception e) {
             logger.error(e);
-            markDownloadFailed(fileInfo.getSrc(), resourceInfo.getRowNum());
+            markDownloadFailed(resourceInfo);
         }
+    }
+
+    private boolean checkIfExists(FileInfo fileInfo) {
+        return Files.exists(Utils.createPath(fileInfo.getDest()));
     }
 
     private FileOutputStream getFOS(FileInfo fileInfo, int row) throws Exception {
         try {
             return new FileOutputStream(fileInfo.getDest());
         } catch (Exception e) {
-            logger.warn("Destination [" + fileInfo.getDest() + "] does not have name.  Trying from url itself");
+            logger.error("Destination [" + fileInfo.getDest() + "] does not have name.  Trying from url itself", e);
         }
         return getFOSFromUrl(fileInfo, row);
     }
@@ -314,7 +331,7 @@ public class ResourceDownLoader extends AppFrame {
     private FileOutputStream getFOSFromUrl(FileInfo fileInfo, int row) throws Exception {
         URLConnection conn = new URL(fileInfo.getSrc()).openConnection();
         String disposition = conn.getHeaderField("Content-disposition");
-        fileInfo.setFilename(getDestPathForName(extractFileNameFromCD(disposition)));
+        fileInfo.setFilename(extractPathFromName(extractFileNameFromCD(disposition)));
 
         updateFileNameInTable(fileInfo, row);
         return new FileOutputStream(fileInfo.getFilename());
@@ -333,22 +350,42 @@ public class ResourceDownLoader extends AppFrame {
         return cdStr;
     }
 
-    public void markDownloadFailed(String src, int row) {
-        markDownloadForError(src, FAILED_MSG, row);
+    public void markDownloadFailed(ResourceInfo info) {
+        markDownloadForError(info, FAILED_MSG);
     }
 
-    public void markDownloadCancelled(String src, int row) {
-        markDownloadForError(src, CANCELLED_MSG, row);
+    public void markDownloadCancelled(ResourceInfo info) {
+        markDownloadForError(info, CANCELLED_MSG);
     }
 
-    private void markDownloadForError(String src, String msg, int i) {
-        logger.log("Marking cancel for " + src);
-        if (isPathMatched(src, i)) {
-            if (!tblInfo.getValueAt(i, COLS.NAME.getIdx()).toString().startsWith(FAILED_MSG) &&
-                    !tblInfo.getValueAt(i, COLS.NAME.getIdx()).toString().startsWith(CANCELLED_MSG)) {
-                tblInfo.setValueAt(msg + tblInfo.getValueAt(i, COLS.NAME.getIdx()), i, COLS.NAME.getIdx());
+    private void markDownloadForError(ResourceInfo info, String msg) {
+        logger.log("Marking cancel for " + info.getUrl());
+        int i = info.getRowNum();
+        if (isPathMatched(info.getUrl(), i)) {
+            String nameVal = tblInfo.getValueAt(i, COLS.NAME.getIdx()).toString();
+            if (!nameVal.startsWith(FAILED_MSG) && !nameVal.startsWith(CANCELLED_MSG)) {
+                setCellValue (msg + tblInfo.getValueAt(i, COLS.NAME.getIdx()), i, COLS.NAME.getIdx());
             }
+            setStatusCellValue (info.getFileStatus().getVal(), i);
         }
+    }
+
+    private void setStatusCellValue(String val, int row) {
+        int col = COLS.STATUS.getIdx();
+        String presentVal = tblInfo.getValueAt(row, col).toString();
+        if (!presentVal.equals(FileStatus.CANCELLED.getVal()) &&
+            !presentVal.equals(FileStatus.DOWNLOADED.getVal()) &&
+            !presentVal.equals(FileStatus.EXISTS.getVal())) {
+            setCellValue(val, row, col);
+        }
+    }
+
+    private void setCellValue(long val, int row, int col) {
+        tblInfo.setValueAt(val, row, col);
+    }
+
+    private void setCellValue(String val, int row, int col) {
+        tblInfo.setValueAt(val, row, col);
     }
 
     private void startTracking(ResourceInfo resourceInfo) {
@@ -360,11 +397,13 @@ public class ResourceDownLoader extends AppFrame {
         return s.startsWith("http");
     }
 
-    private String getDestPath(String url) {
-        return getDestPathForName(url.substring(url.lastIndexOf("/")));
+    private String extractPath(String url) {
+        return extractPathFromName(
+                url.substring(url.lastIndexOf(Utils.FW_SLASH) + Utils.FW_SLASH.length())
+        );
     }
 
-    private String getDestPathForName(String name) {
+    private String extractPathFromName(String name) {
         String destFolder = txtDest.getText();
         if (!Utils.hasValue(destFolder)) {
             destFolder = ".";
@@ -433,11 +472,12 @@ public class ResourceDownLoader extends AppFrame {
             String k = entry.getKey();
             entry.getValue().setRowNum(i);
             if (i < DEFAULT_NUM_ROWS) {
-                tblInfo.setValueAt(i + 1, i, COLS.IDX.getIdx());
-                tblInfo.setValueAt(k, i, COLS.PATH.getIdx());
-                tblInfo.setValueAt(Utils.getFileName(k), i, COLS.NAME.getIdx());
-                tblInfo.setValueAt(0, i, COLS.PERCENT.getIdx());
-                tblInfo.setValueAt(0, i, COLS.TIME.getIdx());
+                setCellValue(i + 1, i, COLS.IDX.getIdx());
+                setCellValue(k, i, COLS.PATH.getIdx());
+                setCellValue(Utils.getFileName(k), i, COLS.NAME.getIdx());
+                setCellValue(FileStatus.IN_QUEUE.getVal(), i, COLS.STATUS.getIdx());
+                setCellValue(0, i, COLS.PERCENT.getIdx());
+                setCellValue(0, i, COLS.TIME.getIdx());
             } else {
                 String[] row = {(i + 1) + "", k, Utils.getFileName(k), "0", "0"};
                 model.addRow(row);
@@ -471,6 +511,10 @@ public class ResourceDownLoader extends AppFrame {
         }
     }
 
+    private boolean isDownloadable(ResourceInfo resourceInfo) {
+        return !resourceInfo.isCancelled() && !resourceInfo.exists();
+    }
+
     static class DownloadFileCallable implements Callable<Boolean> {
 
         private final ResourceDownLoader rd;
@@ -479,7 +523,7 @@ public class ResourceDownLoader extends AppFrame {
         public DownloadFileCallable(ResourceDownLoader rd, ResourceInfo resourceInfo) {
             this.rd = rd;
             this.resourceInfo = resourceInfo;
-            if (!resourceInfo.isCancelled()) {
+            if (rd.isDownloadable (resourceInfo)) {
                 resourceInfo.setFileStatus(FileStatus.DOWNLOADING);
             }
         }
@@ -491,7 +535,7 @@ public class ResourceDownLoader extends AppFrame {
             rd.logger.log("Starting download for " + resourceInfo);
             resourceInfo.getFos().getChannel().transferFrom
                     (resourceInfo.getRbc(), 0, resourceInfo.getFileInfo().getSize());
-            if (!resourceInfo.isCancelled()) {
+            if (rd.isDownloadable(resourceInfo)) {
                 long diffTime = (System.currentTimeMillis() - startTime);
                 long diffTimeInSec = TimeUnit.MILLISECONDS.toSeconds(diffTime);
                 resourceInfo.getFileInfo().setDownloadInSec(diffTimeInSec);
@@ -538,7 +582,7 @@ public class ResourceDownLoader extends AppFrame {
 
         @Override
         public Boolean call() throws Exception {
-            int percent = 0, KB = 1024;
+            int percent;
             long lastSize = 0, fileSize = fileInfo.getSize();
             String speedStr;
             StringBuilder sbLogInfo;
@@ -557,23 +601,14 @@ public class ResourceDownLoader extends AppFrame {
                 resourceInfo.getFileInfo().setDownloadedSize(size);
                 sbLogInfo.append(", percent ").append(percent).append("%");
 
-                // since we are invoking thread every 200 ms - for now changing to 1sec
-                float speed = (int) ((size - lastSize) / KB) * 4;
+                // Since thread.sleep is 250, so multiplying by 4
+                speedStr = Utils.getFileSizeString((size - lastSize) * 4);
                 lastSize = size;
-                speedStr = String.format("%.2f", speed) + "KBs";
-
                 sbLogInfo.append(", Speed ").append(speedStr);
-
-                if (speed / KB > 1) {
-                    // converting to MB
-                    speed /= KB;
-                    speedStr = String.format("%.2f", speed) + "MBs";
-                    sbLogInfo.append(" or ").append(speedStr);
-                }
-                rd.updateTitle(percent + "% at [" + speedStr + "]");
+                rd.updateTitle(percent + "% at " + speedStr);
                 rd.logger.log(sbLogInfo.toString());
 
-                rd.updateFileStatus(fileInfo, percent, resourceInfo.getRowNum());
+                rd.updateFileStatus(percent, resourceInfo);
 
                 Thread.sleep(250);
             } while (percent < 100);
@@ -585,21 +620,24 @@ public class ResourceDownLoader extends AppFrame {
 
     private void updateDownloadTime(FileInfo fileInfo, long time, int i) {
         if (isPathMatched(fileInfo.getSrc(), i)) {
-            tblInfo.setValueAt(time, i, COLS.TIME.getIdx());
+            setCellValue(time, i, COLS.TIME.getIdx());
         }
     }
 
-    private void updateFileStatus(FileInfo fileInfo, int percent, int i) {
+    private void updateFileStatus(int percent, ResourceInfo info) {
+        FileInfo fileInfo = info.getFileInfo();
+        int i = info.getRowNum();
         if (isPathMatched(fileInfo.getSrc(), i)) {
-            tblInfo.setValueAt(percent, i, COLS.PERCENT.getIdx());
-            tblInfo.setValueAt(getDownloadSize(fileInfo), i, COLS.SIZE.getIdx());
-            tblInfo.setValueAt(getDownloadTime(fileInfo), i, COLS.TIME.getIdx());
+            setCellValue(info.getFileStatus().getVal(), i, COLS.STATUS.getIdx());
+            setCellValue(percent, i, COLS.PERCENT.getIdx());
+            setCellValue(getDownloadSize(fileInfo), i, COLS.SIZE.getIdx());
+            setCellValue(getDownloadTime(fileInfo), i, COLS.TIME.getIdx());
         }
     }
 
     private void updateFileNameInTable(FileInfo fileInfo, int i) {
         if (isPathMatched(fileInfo.getSrc(), i)) {
-            tblInfo.setValueAt(Utils.getFileNameForLocal(fileInfo.getFilename()), i, COLS.NAME.getIdx());
+            setCellValue(Utils.getFileNameForLocal(fileInfo.getFilename()), i, COLS.NAME.getIdx());
         }
     }
 
@@ -608,17 +646,7 @@ public class ResourceDownLoader extends AppFrame {
     }
 
     private String getDownloadSize(FileInfo fileInfo) {
-        float size = fileInfo.getSize() / KB;
-        float dsize = fileInfo.getDownloadedSize() / KB;
-        String suffix = "KB";
-        if (size > KB) {
-            // converting to MB
-            size /= KB;
-            dsize /= KB;
-            suffix = "MB";
-        }
-        return String.format("%.2f", dsize) + "/" + String.format("%.2f", size) + suffix;
-
+        return Utils.getFileSizeString(fileInfo.getDownloadedSize()) + "/" + Utils.getFileSizeString(fileInfo.getSize());
     }
 
     private String getDownloadTime(FileInfo fileInfo) {
