@@ -376,7 +376,7 @@ public class ResourceDownLoader extends AppFrame {
 
             if (canCancel(info.getFileStatus().getVal())) {
                 try {
-                    logger.log("Trying to delete cancelled url: " + info.getUrl());
+                    logger.log("Trying to delete incomplete download for cancelled url: " + info.getUrl());
                     Files.deleteIfExists(Utils.createPath(info.getFileInfo().getDest()));
                 } catch (IOException e) {
                     logger.error("Unable to delete cancelled file: " + info.getUrl());
