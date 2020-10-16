@@ -3,6 +3,7 @@ Utility in Java 8+ to download files from an internet or any public available ur
 
 ###### Update on 16-Oct-2020<br>
  - Refactored and used Core/SwingUI
+ - Now copy url from clipboard
 
 ###### Update on 13-Sep-2020<br>
  - Added status column in table
@@ -41,3 +42,6 @@ Attaching screen shot with status:
 
 Attaching screen shot with status:
 ![Image of Yaktocat](https://github.com/svermaji/ResourceDownloader/blob/master/app-images/rd-open-loc-and-tracking.png) 
+
+Attaching screen shot with status. Clipboard changes on 16-Oct-2020:
+![Image of Yaktocat](https://github.com/svermaji/ResourceDownloader/blob/master/app-images/rd-clipboard.png) 

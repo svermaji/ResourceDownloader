@@ -1,4 +1,4 @@
- package com.sv.downloader;
+package com.sv.downloader;
 
 import com.sv.core.DefaultConfigs;
 import com.sv.core.MyLogger;
@@ -15,6 +15,9 @@ import javax.swing.border.EmptyBorder;
 import javax.swing.border.LineBorder;
 import javax.swing.table.DefaultTableModel;
 import java.awt.*;
+import java.awt.datatransfer.Clipboard;
+import java.awt.datatransfer.DataFlavor;
+import java.awt.datatransfer.UnsupportedFlavorException;
 import java.awt.event.WindowAdapter;
 import java.awt.event.WindowEvent;
 import java.io.*;
@@ -77,7 +80,7 @@ public class ResourceDownLoader extends AppFrame {
     private JTextField txtDest, txtSource;
     private JButton btnDownload, btnOpenDest, btnCancel, btnExit;
     private JTable tblInfo;
-    private JTextArea txtUrls;
+    private JTextArea taUrls;
     private String[] emptyRow;
     private DefaultTableModel model;
     private Map<String, ResourceInfo> urlsToDownload;
@@ -90,6 +93,8 @@ public class ResourceDownLoader extends AppFrame {
     private TrustManager[] trustAllCerts;
     private final String title = "Resource Downloader";
     private static final ExecutorService threadPool = Executors.newFixedThreadPool(5);
+
+    private static String lastClipboardText = "";
 
     Border borderBlue = new LineBorder(Color.BLUE, 1);
     Border emptyBorder = new EmptyBorder(new Insets(5, 5, 5, 5));
@@ -176,9 +181,9 @@ public class ResourceDownLoader extends AppFrame {
         JScrollPane jspTable = new JScrollPane(tblInfo);
         jspTable.setBorder(emptyBorder);
 
-        txtUrls = new JTextArea(getUrls(), 5, 1);
-        txtUrls.setBorder(borderBlue);
-        JScrollPane jspUrls = new JScrollPane(txtUrls);
+        taUrls = new JTextArea(getUrls(), 5, 1);
+        taUrls.setBorder(borderBlue);
+        JScrollPane jspUrls = new JScrollPane(taUrls);
         jspUrls.setBorder(emptyBorder);
 
         JPanel jpUrls = new JPanel(new BorderLayout());
@@ -192,8 +197,36 @@ public class ResourceDownLoader extends AppFrame {
         parentContainer.add(controlsPanel, BorderLayout.NORTH);
         parentContainer.add(jpTblAndUrls, BorderLayout.CENTER);
 
+        addWindowFocusListener(new WindowAdapter() {
+            public void windowGainedFocus(WindowEvent e) {
+                copyClipboard();
+            }
+        });
+
         setToCenter();
         logger.log("Program initialized");
+    }
+
+    public void copyClipboard() {
+        Clipboard c = Toolkit.getDefaultToolkit().getSystemClipboard();
+
+        // Get data stored in the clipboard that is in the form of a string (text)
+        try {
+            String data = c.getData(DataFlavor.stringFlavor).toString().trim();
+            if (Utils.hasValue(data) && !data.equals(lastClipboardText)) {
+                int result = JOptionPane.showConfirmDialog(this,
+                        "Use data [" + data + "]",
+                        "Copy data to clipboard?",
+                        JOptionPane.YES_NO_OPTION,
+                        JOptionPane.QUESTION_MESSAGE);
+                if (result == JOptionPane.YES_OPTION) {
+                    taUrls.setText(data);
+                }
+                lastClipboardText = data;
+            }
+        } catch (UnsupportedFlavorException | IOException e) {
+            logger.error("Unable to complete clipboard check action.  Error: " + e.getMessage());
+        }
     }
 
     private String getUrls() {
@@ -305,7 +338,7 @@ public class ResourceDownLoader extends AppFrame {
             fileInfo = new FileInfo(url, extractPath(url), uc.getContentLength());
             logger.log("Url resource size is " + Utils.getFileSizeString(fileInfo.getSize()));
 
-            if (checkIfExists (fileInfo)) {
+            if (checkIfExists(fileInfo)) {
                 resourceInfo.setFileStatus(FileStatus.EXISTS);
                 setStatusCellValue(FileStatus.EXISTS.getVal(), resourceInfo.getRowNum());
                 urlsToDownload.remove(resourceInfo.getUrl());
@@ -377,9 +410,9 @@ public class ResourceDownLoader extends AppFrame {
                     !nameVal.startsWith(Utils.CANCELLED) &&
                     !nameVal.startsWith(Utils.FAILED)
             ) {
-                setCellValue (msg + nameVal, i, COLS.NAME.getIdx());
+                setCellValue(msg + nameVal, i, COLS.NAME.getIdx());
             }
-            setStatusCellValue (info.getFileStatus().getVal(), i);
+            setStatusCellValue(info.getFileStatus().getVal(), i);
 
             if (canCancel(info.getFileStatus().getVal())) {
                 try {
@@ -394,7 +427,7 @@ public class ResourceDownLoader extends AppFrame {
 
     private void setStatusCellValue(String val, int row) {
         int col = COLS.STATUS.getIdx();
-        if (canCancel (tblInfo.getValueAt(row, col).toString())) {
+        if (canCancel(tblInfo.getValueAt(row, col).toString())) {
             setCellValue(val, row, col);
         }
     }
@@ -489,7 +522,7 @@ public class ResourceDownLoader extends AppFrame {
     }
 
     private List<String> readUrlsFromTextArea() {
-        return Arrays.asList(txtUrls.getText().split(System.lineSeparator()));
+        return Arrays.asList(taUrls.getText().split(System.lineSeparator()));
     }
 
     private void clearOldRun() {
@@ -556,7 +589,7 @@ public class ResourceDownLoader extends AppFrame {
         public DownloadFileCallable(ResourceDownLoader rd, ResourceInfo resourceInfo) {
             this.rd = rd;
             this.resourceInfo = resourceInfo;
-            if (rd.isDownloadable (resourceInfo)) {
+            if (rd.isDownloadable(resourceInfo)) {
                 resourceInfo.setFileStatus(FileStatus.DOWNLOADING);
             }
         }
@@ -711,7 +744,7 @@ public class ResourceDownLoader extends AppFrame {
     }
 
     public String getDownloadingUrls() {
-        return txtUrls.getText();
+        return taUrls.getText();
     }
 
     public String getDownloadLocation() {
