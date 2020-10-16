@@ -208,6 +208,7 @@ public class ResourceDownLoader extends AppFrame {
     }
 
     public void copyClipboard() {
+        final int showDataLimit = 100;
         Clipboard c = Toolkit.getDefaultToolkit().getSystemClipboard();
 
         // Get data stored in the clipboard that is in the form of a string (text)
@@ -215,8 +216,11 @@ public class ResourceDownLoader extends AppFrame {
             String data = c.getData(DataFlavor.stringFlavor).toString().trim();
             if (Utils.hasValue(data) && !data.equals(lastClipboardText)) {
                 int result = JOptionPane.showConfirmDialog(this,
-                        "Use data [" + data + "]",
-                        "Copy data from clipboard?",
+                        "Use data [" +
+                                (data.length() < showDataLimit ? data :
+                                        data.substring(0, showDataLimit) + Utils.ELLIPSIS)
+                                + "]",
+                        "Copy data from clipboard ?",
                         JOptionPane.YES_NO_OPTION,
                         JOptionPane.QUESTION_MESSAGE);
                 if (result == JOptionPane.YES_OPTION) {
