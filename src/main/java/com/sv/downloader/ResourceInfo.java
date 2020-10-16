@@ -1,5 +1,7 @@
 package com.sv.downloader;
 
+import com.sv.core.MyLogger;
+
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.nio.channels.ReadableByteChannel;

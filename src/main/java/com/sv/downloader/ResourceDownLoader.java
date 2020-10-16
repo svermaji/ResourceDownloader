@@ -1,4 +1,9 @@
-package com.sv.downloader;
+ package com.sv.downloader;
+
+import com.sv.core.DefaultConfigs;
+import com.sv.core.MyLogger;
+import com.sv.core.Utils;
+import com.sv.swingui.*;
 
 import javax.net.ssl.HttpsURLConnection;
 import javax.net.ssl.SSLContext;
@@ -29,9 +34,13 @@ import java.util.stream.IntStream;
  */
 public class ResourceDownLoader extends AppFrame {
 
+    enum Configs {
+        DownloadLocation, PathToDownload
+    }
+
     public enum COLS {
-        IDX(0, "#", "center", 50),
-        PATH(1, "Path", "left", 0),
+        PATH(0, "Path", "left", 0),
+        IDX(1, "#", "center", 50),
         NAME(2, "Name", "left", -1),
         STATUS(3, "Status", "center", 100),
         PERCENT(4, "Percent", "left", 100),
@@ -65,7 +74,6 @@ public class ResourceDownLoader extends AppFrame {
         }
     }
 
-    private final int KB = 1024;
     private JTextField txtDest, txtSource;
     private JButton btnDownload, btnOpenDest, btnCancel, btnExit;
     private JTable tblInfo;
@@ -76,14 +84,12 @@ public class ResourceDownLoader extends AppFrame {
     private List<String> urlsFromFile;
     private final int DEFAULT_NUM_ROWS = 6;
 
+    //TODO: if site unreachable then cancel after some time
     private final MyLogger logger = MyLogger.createLogger("resource-downloader.log");
-    private final DefaultConfigs configs = new DefaultConfigs(logger);
+    private final DefaultConfigs configs = new DefaultConfigs(logger, Utils.getConfigsAsArr(Configs.class));
     private TrustManager[] trustAllCerts;
     private final String title = "Resource Downloader";
     private static final ExecutorService threadPool = Executors.newFixedThreadPool(5);
-
-    public static final String FAILED_MSG = "Failed !! - ";
-    public static final String CANCELLED_MSG = "Cancelled !! - ";
 
     Border borderBlue = new LineBorder(Color.BLUE, 1);
     Border emptyBorder = new EmptyBorder(new Insets(5, 5, 5, 5));
@@ -128,7 +134,7 @@ public class ResourceDownLoader extends AppFrame {
         JLabel lblSource = new AppLabel("Download from", txtSource, 'F');
         btnDownload = new AppButton("DownLoad", 'D');
         btnOpenDest = new AppButton("Open", 'O');
-        btnOpenDest.setIcon(new ImageIcon("./open.png"));
+        btnOpenDest.setIcon(new ImageIcon("./icons/open-icon.png"));
         btnOpenDest.setToolTipText("Open Destination");
         btnOpenDest.addActionListener(e -> {
             try {
@@ -139,7 +145,7 @@ public class ResourceDownLoader extends AppFrame {
         });
         btnCancel = new AppButton("Cancel", 'C');
         btnExit = new AppExitButton();
-        txtDest = new JTextField(configs.getConfig(DefaultConfigs.Config.DOWNLOAD_LOC));
+        txtDest = new JTextField(configs.getConfig(Configs.DownloadLocation.name()));
         JLabel lblDest = new AppLabel("Location To Save", txtDest, 'N');
         txtDest.setColumns(10);
 
@@ -153,7 +159,7 @@ public class ResourceDownLoader extends AppFrame {
 
         controlsPanel.add(lblSource);
         controlsPanel.add(txtSource);
-        txtSource.setText(configs.getConfig(DefaultConfigs.Config.URLS_TO_DOWNLOAD));
+        txtSource.setText(configs.getConfig(Configs.PathToDownload.name()));
         txtSource.setColumns(20);
 
         controlsPanel.add(lblDest);
@@ -266,7 +272,7 @@ public class ResourceDownLoader extends AppFrame {
      */
     private void exitForm() {
         cancelDownLoad();
-        configs.saveAllConfigs(this);
+        configs.saveConfig(this);
         logger.log("Goodbye");
         logger.dispose();
         setVisible(false);
@@ -297,7 +303,7 @@ public class ResourceDownLoader extends AppFrame {
             URL u = new URL(url);
             URLConnection uc = u.openConnection();
             fileInfo = new FileInfo(url, extractPath(url), uc.getContentLength());
-            logger.log("Url resource size is [" + fileInfo.getSize() + "] Bytes i.e. [" + (fileInfo.getSize() / KB) + "] KB");
+            logger.log("Url resource size is " + Utils.getFileSizeString(fileInfo.getSize()));
 
             if (checkIfExists (fileInfo)) {
                 resourceInfo.setFileStatus(FileStatus.EXISTS);
@@ -326,7 +332,8 @@ public class ResourceDownLoader extends AppFrame {
         try {
             return new FileOutputStream(fileInfo.getDest());
         } catch (Exception e) {
-            logger.error("Destination [" + fileInfo.getDest() + "] does not have name.  Trying from url itself", e);
+            logger.error("Destination [" + fileInfo.getDest()
+                    + "] does not have name.  Trying from url itself. Error: " + e.getMessage());
         }
         return getFOSFromUrl(fileInfo, row);
     }
@@ -354,11 +361,11 @@ public class ResourceDownLoader extends AppFrame {
     }
 
     public void markDownloadFailed(ResourceInfo info) {
-        markDownloadForError(info, FAILED_MSG);
+        markDownloadForError(info, Utils.FAILED);
     }
 
     public void markDownloadCancelled(ResourceInfo info) {
-        markDownloadForError(info, CANCELLED_MSG);
+        markDownloadForError(info, Utils.CANCELLED);
     }
 
     private void markDownloadForError(ResourceInfo info, String msg) {
@@ -367,8 +374,8 @@ public class ResourceDownLoader extends AppFrame {
         if (isPathMatched(info.getUrl(), i)) {
             String nameVal = tblInfo.getValueAt(i, COLS.NAME.getIdx()).toString();
             if (canCancel(info.getFileStatus().getVal()) &&
-                    !nameVal.startsWith(CANCELLED_MSG) &&
-                    !nameVal.startsWith(FAILED_MSG)
+                    !nameVal.startsWith(Utils.CANCELLED) &&
+                    !nameVal.startsWith(Utils.FAILED)
             ) {
                 setCellValue (msg + nameVal, i, COLS.NAME.getIdx());
             }
@@ -378,8 +385,8 @@ public class ResourceDownLoader extends AppFrame {
                 try {
                     logger.log("Trying to delete incomplete download for cancelled url: " + info.getUrl());
                     Files.deleteIfExists(Utils.createPath(info.getFileInfo().getDest()));
-                } catch (IOException e) {
-                    logger.error("Unable to delete cancelled file: " + info.getUrl());
+                } catch (NullPointerException | IOException e) {
+                    logger.error("File not exists or unable to delete cancelled file: " + info.getUrl());
                 }
             }
         }
@@ -416,7 +423,7 @@ public class ResourceDownLoader extends AppFrame {
 
     private String extractPath(String url) {
         return extractPathFromName(
-                url.substring(url.lastIndexOf(Utils.FW_SLASH) + Utils.FW_SLASH.length())
+                url.substring(url.lastIndexOf(Utils.F_SLASH) + Utils.F_SLASH.length())
         );
     }
 
@@ -653,9 +660,9 @@ public class ResourceDownLoader extends AppFrame {
         }
 
         @Override
-        public Boolean call() throws Exception {
+        public Boolean call() {
             do {
-                Thread.sleep(2000);
+                Utils.sleep(2000);
             } while (!rd.urlsToDownload.isEmpty());
 
             rd.enableControls();
@@ -683,7 +690,7 @@ public class ResourceDownLoader extends AppFrame {
 
     private void updateFileNameInTable(FileInfo fileInfo, int i) {
         if (isPathMatched(fileInfo.getSrc(), i)) {
-            setCellValue(Utils.getFileNameForLocal(fileInfo.getFilename()), i, COLS.NAME.getIdx());
+            setCellValue(Utils.getFileName(fileInfo.getFilename()), i, COLS.NAME.getIdx());
         }
     }
 
@@ -699,7 +706,7 @@ public class ResourceDownLoader extends AppFrame {
         return fileInfo.getDownloadInSec() + "";
     }
 
-    public String getUrlsToDownload() {
+    public String getPathToDownload() {
         return txtSource.getText();
     }
 
@@ -707,9 +714,8 @@ public class ResourceDownLoader extends AppFrame {
         return txtUrls.getText();
     }
 
-    public String getDownloadLoc() {
+    public String getDownloadLocation() {
         return txtDest.getText();
     }
-
 }
 

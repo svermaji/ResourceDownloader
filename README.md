@@ -1,6 +1,9 @@
 # ResourceDownloader
 Utility in Java 8+ to download files from an internet or any public available url.
 
+###### Update on 16-Oct-2020<br>
+ - Refactored and used Core/SwingUI
+
 ###### Update on 13-Sep-2020<br>
  - Added status column in table
  - If file already exists downloading will be skipped
@@ -25,16 +28,16 @@ Once download starts, UI shows the progress of each file and internet speed.
 Configurations and Urls will be auto-stored to config files and will be reloaded on start up.
 
 Attaching screen shot:
-![Image of Yaktocat](https://github.com/svermaji/ResourceDownloader/blob/master/rd.png) 
+![Image of Yaktocat](https://github.com/svermaji/ResourceDownloader/blob/master/app-images/rd.png) 
 
 Attaching screen shot with progress bar changes:
-![Image of Yaktocat](https://github.com/svermaji/ResourceDownloader/blob/master/rd-progress-bars.png) 
+![Image of Yaktocat](https://github.com/svermaji/ResourceDownloader/blob/master/app-images/rd-progress-bars.png) 
 
 Attaching screen shot with progress bar and text area changes:
-![Image of Yaktocat](https://github.com/svermaji/ResourceDownloader/blob/master/rd-table-and-textarea.png) 
+![Image of Yaktocat](https://github.com/svermaji/ResourceDownloader/blob/master/app-images/rd-table-and-textarea.png) 
 
 Attaching screen shot with status:
-![Image of Yaktocat](https://github.com/svermaji/ResourceDownloader/blob/master/rd-table-status-col.png) 
+![Image of Yaktocat](https://github.com/svermaji/ResourceDownloader/blob/master/app-images/rd-table-status-col.png) 
 
 Attaching screen shot with status:
-![Image of Yaktocat](https://github.com/svermaji/ResourceDownloader/blob/master/rd-open-loc-and-tracking.png) 
+![Image of Yaktocat](https://github.com/svermaji/ResourceDownloader/blob/master/app-images/rd-open-loc-and-tracking.png) 
