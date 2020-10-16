@@ -44,4 +44,4 @@ Attaching screen shot with status:
 ![Image of Yaktocat](https://github.com/svermaji/ResourceDownloader/blob/master/app-images/rd-open-loc-and-tracking.png) 
 
 Attaching screen shot with status. Clipboard changes on 16-Oct-2020:
-![Image of Yaktocat](https://github.com/svermaji/ResourceDownloader/blob/master/app-images/rd-clipboard.png) 
+![Image of Yaktocat](https://github.com/svermaji/ResourceDownloader/blob/master/app-images/rd-clipboard-url.png) 

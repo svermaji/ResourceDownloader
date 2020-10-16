@@ -216,7 +216,7 @@ public class ResourceDownLoader extends AppFrame {
             if (Utils.hasValue(data) && !data.equals(lastClipboardText)) {
                 int result = JOptionPane.showConfirmDialog(this,
                         "Use data [" + data + "]",
-                        "Copy data to clipboard?",
+                        "Copy data from clipboard?",
                         JOptionPane.YES_NO_OPTION,
                         JOptionPane.QUESTION_MESSAGE);
                 if (result == JOptionPane.YES_OPTION) {
