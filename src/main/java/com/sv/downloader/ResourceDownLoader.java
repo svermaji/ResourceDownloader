@@ -14,6 +14,7 @@ import javax.swing.border.Border;
 import javax.swing.border.EmptyBorder;
 import javax.swing.border.LineBorder;
 import javax.swing.table.DefaultTableModel;
+import javax.swing.table.TableColumn;
 import java.awt.*;
 import java.awt.datatransfer.Clipboard;
 import java.awt.datatransfer.DataFlavor;
@@ -203,6 +204,7 @@ public class ResourceDownLoader extends AppFrame {
             }
         });
 
+        setControlsToEnable();
         setToCenter();
         logger.log("Program initialized");
     }
@@ -241,31 +243,15 @@ public class ResourceDownLoader extends AppFrame {
     }
 
     private void createTable() {
-        model = new DefaultTableModel() {
 
-            @Override
-            public int getColumnCount() {
-                return COLS.values().length;
-            }
-
-            @Override
-            public String getColumnName(int index) {
-                return COLS.values()[index].getName();
-            }
-
-        };
+        model = SwingUtils.getTableModel(
+                Arrays.stream(COLS.class.getEnumConstants()).map(COLS::getName).toArray(String[]::new)
+        );
 
         createDefaultRows();
 
-        tblInfo = new JTable(model);
+        tblInfo = new AppTable(model);
         tblInfo.setBorder(borderBlue);
-
-        // For making contents non editable
-        tblInfo.setDefaultEditor(Object.class, null);
-
-        tblInfo.setAutoscrolls(true);
-        tblInfo.setPreferredScrollableViewportSize(tblInfo.getPreferredSize());
-        // PATH col contains tooltip
 
         CellRendererLeftAlign leftRenderer = new CellRendererLeftAlign();
         CellRendererCenterAlign centerRenderer = new CellRendererCenterAlign();
@@ -275,13 +261,13 @@ public class ResourceDownLoader extends AppFrame {
                     col.getAlignment().equals("center") ? centerRenderer : leftRenderer);
 
             if (col.getWidth() != -1) {
-                tblInfo.getColumnModel().getColumn(col.getIdx()).setMinWidth(col.getWidth());
-                tblInfo.getColumnModel().getColumn(col.getIdx()).setMaxWidth(col.getWidth());
+                TableColumn colIdx = tblInfo.getColumnModel().getColumn(col.getIdx());
+                colIdx.setMinWidth(col.getWidth());
+                colIdx.setMaxWidth(col.getWidth());
             }
         }
 
         tblInfo.getColumnModel().getColumn(COLS.PERCENT.getIdx()).setCellRenderer(new CellRendererProgressBar());
-
     }
 
     private void createDefaultRows() {
@@ -296,12 +282,6 @@ public class ResourceDownLoader extends AppFrame {
         } catch (Exception e) {
             logger.error(e);
         }
-    }
-
-    private void setToCenter() {
-        pack();
-        setLocationRelativeTo(null);
-        setVisible(true);
     }
 
     /**
@@ -481,7 +461,11 @@ public class ResourceDownLoader extends AppFrame {
         disableCancelButton();
         if (!urlsToDownload.isEmpty()) {
             logger.log("Cancelling all downloads. Remaining downloads: " + urlsToDownload.size());
-            urlsToDownload.forEach((u, ri) -> ri.closeResource());
+            // converting to lamda throws concurrent modification exception
+            for (Map.Entry<String, ResourceInfo> entry : urlsToDownload.entrySet()) {
+                ResourceInfo ri = entry.getValue();
+                ri.closeResource();
+            }
             urlsToDownload.clear();
             enableControls();
             updateTitle("Cancelled download!!");
@@ -556,18 +540,13 @@ public class ResourceDownLoader extends AppFrame {
         }
     }
 
-    private void updateControls(boolean enable) {
-        txtSource.setEnabled(enable);
-        txtDest.setEnabled(enable);
-        btnDownload.setEnabled(enable);
-    }
-
-    private void enableControls() {
-        updateControls(true);
-    }
-
-    private void disableControls() {
-        updateControls(false);
+    private void setControlsToEnable() {
+        Component[] components = {
+                txtSource, txtDest, btnDownload
+        };
+        setComponentToEnable(components);
+        setComponentContrastToEnable(new Component[]{btnCancel});
+        enableControls();
     }
 
     private java.util.List<String> getUrlsFromFile(String filePath) {

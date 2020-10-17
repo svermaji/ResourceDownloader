@@ -14,7 +14,7 @@ public class ResourceInfo {
     private int rowNum;
     private static MyLogger logger;
     private final String url;
-    private ResourceDownLoader rdl;
+    private final ResourceDownLoader rdl;
 
     public ResourceInfo(String url, MyLogger myLogger, ResourceDownLoader rdl) {
         this.url = url;
@@ -68,13 +68,13 @@ public class ResourceInfo {
     }
 
     public void closeResource() {
-        if (canMarkCancelled(fileStatus)) {
-            logger.log("Marking status cancel for " + getUrl());
-            fileStatus = FileStatus.CANCELLED;
-            rdl.markDownloadCancelled(this);
-        }
-        if (fos != null) {
-            try {
+        try {
+            if (canMarkCancelled(fileStatus)) {
+                logger.log("Marking status cancel for " + getUrl());
+                fileStatus = FileStatus.CANCELLED;
+                rdl.markDownloadCancelled(this);
+            }
+            if (fos != null) {
                 fos.flush();
                 fos.close();
                 if (rbc != null) {
@@ -82,9 +82,9 @@ public class ResourceInfo {
                 }
                 fos = null;
                 rbc = null;
-            } catch (IOException e) {
-                logger.error(e);
             }
+        } catch (IOException e) {
+            logger.error(e);
         }
     }
 
