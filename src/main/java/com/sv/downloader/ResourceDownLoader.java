@@ -92,7 +92,6 @@ public class ResourceDownLoader extends AppFrame {
     private final MyLogger logger = MyLogger.createLogger("resource-downloader.log");
     private final DefaultConfigs configs = new DefaultConfigs(logger, Utils.getConfigsAsArr(Configs.class));
     private TrustManager[] trustAllCerts;
-    private final String title = "Resource Downloader";
     private static final ExecutorService threadPool = Executors.newFixedThreadPool(5);
 
     private static String lastClipboardText = "";
@@ -118,6 +117,10 @@ public class ResourceDownLoader extends AppFrame {
         };
     }
 
+    public ResourceDownLoader() {
+        super("Resource Downloader");
+    }
+
     /**
      * This method initializes the form.
      */
@@ -134,7 +137,6 @@ public class ResourceDownLoader extends AppFrame {
         JPanel controlsPanel = new JPanel();
 
         parentContainer.setLayout(new BorderLayout());
-        setTitle(title);
 
         txtSource = new JTextField();
         JLabel lblSource = new AppLabel("Download from", txtSource, 'F');
@@ -295,10 +297,6 @@ public class ResourceDownLoader extends AppFrame {
         setVisible(false);
         dispose();
         System.exit(0);
-    }
-
-    public void updateTitle(String info) {
-        setTitle(Utils.hasValue(info) ? title + " - " + info : title);
     }
 
     /**
