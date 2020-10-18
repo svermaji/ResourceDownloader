@@ -3,6 +3,8 @@ package com.sv.downloader;
 import com.sv.core.DefaultConfigs;
 import com.sv.core.MyLogger;
 import com.sv.core.Utils;
+import com.sv.downloader.helpers.DownloadFileCallable;
+import com.sv.downloader.helpers.TrackAllDownloadsCallable;
 import com.sv.swingui.*;
 
 import javax.net.ssl.HttpsURLConnection;
@@ -32,7 +34,6 @@ import java.util.*;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
-import java.util.concurrent.TimeUnit;
 
 /**
  * This class will help in downloading bunch of urls that
@@ -204,7 +205,7 @@ public class ResourceDownLoader extends AppFrame {
         setControlsToEnable();
         setToCenter();
         setSize(getWidth(), getHeight() / 2);
-        this.setLocationRelativeTo((Component) null);
+        this.setLocationRelativeTo(null);
         logger.log("Program initialized");
     }
 
@@ -464,7 +465,7 @@ public class ResourceDownLoader extends AppFrame {
 
     private void cancelDownLoad() {
         disableCancelButton();
-        if (!urlsToDownload.isEmpty()) {
+        if (!isUrlsToDownloadEmpty()) {
             logger.log("Cancelling all downloads. Remaining downloads: " + urlsToDownload.size());
             synchronized (ResourceDownLoader.class) {
                 try {
@@ -530,6 +531,7 @@ public class ResourceDownLoader extends AppFrame {
         int i = 0;
         for (Map.Entry<String, ResourceInfo> entry : urlsToDownload.entrySet()) {
             String k = entry.getKey();
+            // cannot use onlyname variable as ResourceInfo not initialized completely
             entry.getValue().setRowNum(i);
             if (i < DEFAULT_NUM_ROWS) {
                 setCellValue(k, i, COLS.PATH.getIdx());
@@ -567,44 +569,8 @@ public class ResourceDownLoader extends AppFrame {
         }
     }
 
-    private boolean isDownloadable(ResourceInfo resourceInfo) {
+    public boolean isDownloadable(ResourceInfo resourceInfo) {
         return !resourceInfo.isCancelled() && !resourceInfo.exists();
-    }
-
-    static class DownloadFileCallable implements Callable<Boolean> {
-
-        private final ResourceDownLoader rd;
-        private final ResourceInfo resourceInfo;
-
-        public DownloadFileCallable(ResourceDownLoader rd, ResourceInfo resourceInfo) {
-            this.rd = rd;
-            this.resourceInfo = resourceInfo;
-            if (rd.isDownloadable(resourceInfo)) {
-                resourceInfo.setFileStatus(FileStatus.DOWNLOADING);
-            }
-        }
-
-        @Override
-        public Boolean call() throws Exception {
-            long startTime = System.currentTimeMillis();
-
-            rd.logger.log("Starting download for " + resourceInfo);
-            resourceInfo.getFos().getChannel().transferFrom
-                    (resourceInfo.getRbc(), 0, resourceInfo.getFileInfo().getSize());
-            if (rd.isDownloadable(resourceInfo)) {
-                long diffTime = (System.currentTimeMillis() - startTime);
-                long diffTimeInSec = TimeUnit.MILLISECONDS.toSeconds(diffTime);
-                resourceInfo.getFileInfo().setDownloadInSec(diffTimeInSec);
-                rd.logger.log("download complete for " + resourceInfo);
-                rd.updateDownloadTime(resourceInfo.getFileInfo(), diffTimeInSec, resourceInfo.getRowNum());
-            }
-            resourceInfo.markDownload();
-            synchronized (ResourceDownLoader.class) {
-                rd.urlsToDownload.remove(resourceInfo.getUrl());
-            }
-
-            return true;
-        }
     }
 
     static class StartDownloadCallable implements Callable<Boolean> {
@@ -640,7 +606,7 @@ public class ResourceDownLoader extends AppFrame {
 
         @Override
         public Boolean call() {
-            int percent = 0;
+            int percent;
             long lastSize = 0, fileSize = fileInfo.getSize();
             String speedStr;
             StringBuilder sbLogInfo;
@@ -682,27 +648,19 @@ public class ResourceDownLoader extends AppFrame {
 
     }
 
-    static class TrackAllDownloadsCallable implements Callable<Boolean> {
-
-        private final ResourceDownLoader rd;
-
-        TrackAllDownloadsCallable(ResourceDownLoader rd) {
-            this.rd = rd;
-        }
-
-        @Override
-        public Boolean call() {
-            do {
-                Utils.sleep(2000);
-            } while (!rd.urlsToDownload.isEmpty());
-
-            rd.enableControls();
-            return true;
-        }
-
+    public boolean isUrlsToDownloadEmpty() {
+        return urlsToDownload.isEmpty();
     }
 
-    private void updateDownloadTime(FileInfo fileInfo, long time, int i) {
+    public void removeFromUrlsToDownload(String key) {
+        urlsToDownload.remove(key);
+    }
+
+    public void log (String m) {
+        logger.log(m);
+    }
+
+    public void updateDownloadTime(FileInfo fileInfo, long time, int i) {
         if (isPathMatched(fileInfo.getSrc(), i)) {
             setCellValue(time, i, COLS.TIME.getIdx());
         }
