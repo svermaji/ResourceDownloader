@@ -1,27 +1,35 @@
 package com.sv.downloader;
 
+import com.sv.core.Utils;
+
 import java.util.concurrent.TimeUnit;
 
 class FileInfo {
-    private final String src, dest;
+    private final String src, destination;
     private String filename = null;
+    private String onlyName = null;
     private final long size;
     private long downloadedSize = 0;
     private long downloadStartTime = 0;
     private long downloadInSec = 0;
 
-    FileInfo(String src, String dest, int size) {
+    FileInfo(String src, String destination, int size) {
         this.src = src;
-        this.dest = dest;
+        this.destination = destination;
+        this.onlyName = Utils.getFileName(destination);
         this.size = size;
+    }
+
+    public String getOnlyName() {
+        return onlyName;
     }
 
     public String getSrc() {
         return src;
     }
 
-    public String getDest() {
-        return dest;
+    public String getDestination() {
+        return destination;
     }
 
     public void setFilename(String filename) {
@@ -67,9 +75,10 @@ class FileInfo {
     public String toString() {
         return "FileInfo{" +
                 "src='" + src + '\'' +
-                ", dest='" + dest + '\'' +
+                ", dest='" + destination + '\'' +
                 ", size=" + size +
                 ", timeToDownloadInSec=" + downloadInSec +
                 '}';
     }
+
 }

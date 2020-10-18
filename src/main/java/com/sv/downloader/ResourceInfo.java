@@ -64,16 +64,21 @@ public class ResourceInfo {
     }
 
     public void setFileStatus(FileStatus fileStatus) {
+        //logger.log("setFileStatus - "+fileStatus.getVal() + ", fs = " + this.fileStatus);
+        //if (!isCancelled() && !isFailed()) {
+        //  logger.log("setting - ");
         this.fileStatus = fileStatus;
+        //}
     }
 
     public void closeResource() {
-        try {
-            if (canMarkCancelled(fileStatus)) {
-                logger.log("Marking status cancel for " + getUrl());
+        if (canMarkCancelled(fileStatus)) {
+            logger.log("Marking status cancel for " + getUrl());
+            synchronized (ResourceInfo.class) {
                 fileStatus = FileStatus.CANCELLED;
-                rdl.markDownloadCancelled(this);
             }
+        }
+        try {
             if (fos != null) {
                 fos.flush();
                 fos.close();
@@ -86,6 +91,8 @@ public class ResourceInfo {
         } catch (IOException e) {
             logger.error(e);
         }
+        // first close resource then try to delete
+        rdl.markDownloadCancelled(this);
     }
 
     private boolean canMarkCancelled(FileStatus fileStatus) {
@@ -98,7 +105,7 @@ public class ResourceInfo {
         if (fileStatus != FileStatus.CANCELLED) {
             fileStatus = FileStatus.DOWNLOADED;
         }
-        logger.log("File status set to " + fileStatus);
+        logger.log(nameAndStatus());
         closeResource();
     }
 
@@ -106,12 +113,22 @@ public class ResourceInfo {
     public String toString() {
         return "ResourceInfo{" +
                 "fileInfo=" + fileInfo +
-                ", fileStatus=" + fileStatus +
+                ", fileStatus=" + fileStatus.getVal() +
                 '}';
+    }
+
+    public String nameAndStatus() {
+        return "File [" + fileInfo.getOnlyName()
+                + "], Status [" + fileStatus.getVal()
+                + "]";
     }
 
     public boolean isCancelled() {
         return fileStatus.equals(FileStatus.CANCELLED);
+    }
+
+    public boolean isFailed() {
+        return fileStatus.equals(FileStatus.FAILED);
     }
 
     public boolean exists() {

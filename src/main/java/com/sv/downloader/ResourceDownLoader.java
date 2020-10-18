@@ -10,9 +10,6 @@ import javax.net.ssl.SSLContext;
 import javax.net.ssl.TrustManager;
 import javax.net.ssl.X509TrustManager;
 import javax.swing.*;
-import javax.swing.border.Border;
-import javax.swing.border.EmptyBorder;
-import javax.swing.border.LineBorder;
 import javax.swing.table.DefaultTableModel;
 import javax.swing.table.TableColumn;
 import java.awt.*;
@@ -21,16 +18,21 @@ import java.awt.datatransfer.DataFlavor;
 import java.awt.datatransfer.UnsupportedFlavorException;
 import java.awt.event.WindowAdapter;
 import java.awt.event.WindowEvent;
-import java.io.*;
-import java.net.*;
+import java.io.FileNotFoundException;
+import java.io.FileOutputStream;
+import java.io.IOException;
+import java.net.URL;
+import java.net.URLConnection;
 import java.nio.channels.Channels;
 import java.nio.channels.ReadableByteChannel;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
 import java.util.*;
-import java.util.concurrent.*;
-import java.util.stream.IntStream;
+import java.util.concurrent.Callable;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 
 /**
  * This class will help in downloading bunch of urls that
@@ -82,7 +84,6 @@ public class ResourceDownLoader extends AppFrame {
     private JButton btnDownload, btnOpenDest, btnCancel, btnExit;
     private JTable tblInfo;
     private JTextArea taUrls;
-    private String[] emptyRow;
     private DefaultTableModel model;
     private Map<String, ResourceInfo> urlsToDownload;
     private List<String> urlsFromFile;
@@ -95,9 +96,6 @@ public class ResourceDownLoader extends AppFrame {
     private static final ExecutorService threadPool = Executors.newFixedThreadPool(5);
 
     private static String lastClipboardText = "";
-
-    Border borderBlue = new LineBorder(Color.BLUE, 1);
-    Border emptyBorder = new EmptyBorder(new Insets(5, 5, 5, 5));
 
     private void createTrustManager() {
         trustAllCerts = new TrustManager[]{
@@ -125,9 +123,6 @@ public class ResourceDownLoader extends AppFrame {
      * This method initializes the form.
      */
     private void initComponents() {
-
-        emptyRow = new String[COLS.values().length];
-        Arrays.fill(emptyRow, Utils.EMPTY);
 
         createTrustManager();
         trustAllHttps();
@@ -182,12 +177,12 @@ public class ResourceDownLoader extends AppFrame {
 
         createTable();
         JScrollPane jspTable = new JScrollPane(tblInfo);
-        jspTable.setBorder(emptyBorder);
+        jspTable.setBorder(SwingUtils.EMPTY_BORDER);
 
         taUrls = new JTextArea(getUrls(), 5, 1);
-        taUrls.setBorder(borderBlue);
+        taUrls.setBorder(SwingUtils.BLUE_BORDER);
         JScrollPane jspUrls = new JScrollPane(taUrls);
-        jspUrls.setBorder(emptyBorder);
+        jspUrls.setBorder(SwingUtils.EMPTY_BORDER);
 
         JPanel jpUrls = new JPanel(new BorderLayout());
         jpUrls.add(new JLabel(" Urls to download"), BorderLayout.NORTH);
@@ -208,6 +203,8 @@ public class ResourceDownLoader extends AppFrame {
 
         setControlsToEnable();
         setToCenter();
+        setSize(getWidth(), getHeight() / 2);
+        this.setLocationRelativeTo((Component) null);
         logger.log("Program initialized");
     }
 
@@ -228,13 +225,19 @@ public class ResourceDownLoader extends AppFrame {
                         JOptionPane.YES_NO_OPTION,
                         JOptionPane.QUESTION_MESSAGE);
                 if (result == JOptionPane.YES_OPTION) {
-                    taUrls.setText(data);
+                    taUrls.setText(checkLineEndings(data));
                 }
                 lastClipboardText = data;
             }
         } catch (UnsupportedFlavorException | IOException e) {
             logger.error("Unable to complete clipboard check action.  Error: " + e.getMessage());
         }
+    }
+
+    private String checkLineEndings(String data) {
+        String NEW_LINE_REGEX = "\r?\n";
+        String SYS_LINE_END = System.lineSeparator();
+        return data.replaceAll(NEW_LINE_REGEX, SYS_LINE_END);
     }
 
     private String getUrls() {
@@ -245,7 +248,6 @@ public class ResourceDownLoader extends AppFrame {
     }
 
     private void createTable() {
-
         model = SwingUtils.getTableModel(
                 Arrays.stream(COLS.class.getEnumConstants()).map(COLS::getName).toArray(String[]::new)
         );
@@ -253,7 +255,7 @@ public class ResourceDownLoader extends AppFrame {
         createDefaultRows();
 
         tblInfo = new AppTable(model);
-        tblInfo.setBorder(borderBlue);
+        tblInfo.setBorder(SwingUtils.BLUE_BORDER);
 
         CellRendererLeftAlign leftRenderer = new CellRendererLeftAlign();
         CellRendererCenterAlign centerRenderer = new CellRendererCenterAlign();
@@ -273,7 +275,7 @@ public class ResourceDownLoader extends AppFrame {
     }
 
     private void createDefaultRows() {
-        IntStream.range(0, DEFAULT_NUM_ROWS).forEach(i -> model.addRow(emptyRow));
+        SwingUtils.removeAndCreateEmptyRows(COLS.values().length, DEFAULT_NUM_ROWS, model);
     }
 
     private void trustAllHttps() {
@@ -282,7 +284,7 @@ public class ResourceDownLoader extends AppFrame {
             sc.init(null, trustAllCerts, new java.security.SecureRandom());
             HttpsURLConnection.setDefaultSSLSocketFactory(sc.getSocketFactory());
         } catch (Exception e) {
-            logger.error(e);
+            logger.error("Unable to setup https. Details: " + e.getMessage());
         }
     }
 
@@ -323,7 +325,9 @@ public class ResourceDownLoader extends AppFrame {
             if (checkIfExists(fileInfo)) {
                 resourceInfo.setFileStatus(FileStatus.EXISTS);
                 setStatusCellValue(FileStatus.EXISTS.getVal(), resourceInfo.getRowNum());
-                urlsToDownload.remove(resourceInfo.getUrl());
+                synchronized (ResourceDownLoader.class) {
+                    urlsToDownload.remove(resourceInfo.getUrl());
+                }
             } else {
                 rbc = Channels.newChannel(u.openStream());
                 fos = getFOS(fileInfo, resourceInfo.getRowNum());
@@ -333,21 +337,24 @@ public class ResourceDownLoader extends AppFrame {
                 threadPool.submit(new DownloadFileCallable(this, resourceInfo));
                 startTracking(resourceInfo);
             }
+        } catch (FileNotFoundException e) {
+            logger.error("No file at given url. Details: " + e.getMessage());
+            markDownloadFailed(resourceInfo);
         } catch (Exception e) {
-            logger.error(e);
+            logger.error("Unable to download. Details: " + e.getMessage());
             markDownloadFailed(resourceInfo);
         }
     }
 
     private boolean checkIfExists(FileInfo fileInfo) {
-        return Files.exists(Utils.createPath(fileInfo.getDest()));
+        return Files.exists(Utils.createPath(fileInfo.getDestination()));
     }
 
     private FileOutputStream getFOS(FileInfo fileInfo, int row) throws Exception {
         try {
-            return new FileOutputStream(fileInfo.getDest());
+            return new FileOutputStream(fileInfo.getDestination());
         } catch (Exception e) {
-            logger.error("Destination [" + fileInfo.getDest()
+            logger.error("Destination [" + fileInfo.getDestination()
                     + "] does not have name.  Trying from url itself. Error: " + e.getMessage());
         }
         return getFOSFromUrl(fileInfo, row);
@@ -384,7 +391,7 @@ public class ResourceDownLoader extends AppFrame {
     }
 
     private void markDownloadForError(ResourceInfo info, String msg) {
-        logger.log("Marking cancel for " + info.getUrl());
+        logger.log("Marking cancel in UI for " + info.getUrl());
         int i = info.getRowNum();
         if (isPathMatched(info.getUrl(), i)) {
             String nameVal = tblInfo.getValueAt(i, COLS.NAME.getIdx()).toString();
@@ -398,10 +405,10 @@ public class ResourceDownLoader extends AppFrame {
 
             if (canCancel(info.getFileStatus().getVal())) {
                 try {
-                    logger.log("Trying to delete incomplete download for cancelled url: " + info.getUrl());
-                    Files.deleteIfExists(Utils.createPath(info.getFileInfo().getDest()));
+                    logger.log("Trying to delete incomplete download for url: " + info.getUrl());
+                    Files.deleteIfExists(Utils.createPath(info.getFileInfo().getDestination()));
                 } catch (NullPointerException | IOException e) {
-                    logger.error("File not exists or unable to delete cancelled file: " + info.getUrl());
+                    logger.error("File not exists or unable to delete file: " + info.getUrl());
                 }
             }
         }
@@ -459,10 +466,13 @@ public class ResourceDownLoader extends AppFrame {
         disableCancelButton();
         if (!urlsToDownload.isEmpty()) {
             logger.log("Cancelling all downloads. Remaining downloads: " + urlsToDownload.size());
-            // converting to lamda throws concurrent modification exception
-            for (Map.Entry<String, ResourceInfo> entry : urlsToDownload.entrySet()) {
-                ResourceInfo ri = entry.getValue();
-                ri.closeResource();
+            synchronized (ResourceDownLoader.class) {
+                try {
+                    urlsToDownload.forEach((key, ri) -> ri.closeResource());
+                } catch (RuntimeException e) {
+                    logger.error("Error in closing resources. Details: " + e.getMessage());
+                    logger.error(e);
+                }
             }
             urlsToDownload.clear();
             enableControls();
@@ -513,8 +523,6 @@ public class ResourceDownLoader extends AppFrame {
 
     private void clearOldRun() {
         urlsToDownload.clear();
-        //empty table
-        IntStream.range(0, tblInfo.getRowCount()).forEach(i -> model.removeRow(0));
         createDefaultRows();
     }
 
@@ -524,14 +532,15 @@ public class ResourceDownLoader extends AppFrame {
             String k = entry.getKey();
             entry.getValue().setRowNum(i);
             if (i < DEFAULT_NUM_ROWS) {
-                setCellValue(i + 1, i, COLS.IDX.getIdx());
                 setCellValue(k, i, COLS.PATH.getIdx());
+                setCellValue(i + 1, i, COLS.IDX.getIdx());
                 setCellValue(Utils.getFileName(k), i, COLS.NAME.getIdx());
                 setCellValue(FileStatus.IN_QUEUE.getVal(), i, COLS.STATUS.getIdx());
                 setCellValue(0, i, COLS.PERCENT.getIdx());
                 setCellValue(0, i, COLS.TIME.getIdx());
             } else {
-                String[] row = {(i + 1) + "", k, Utils.getFileName(k), "0", "0"};
+                // maintain the order
+                String[] row = {k, (i + 1) + "", Utils.getFileName(k), "0", "0"};
                 model.addRow(row);
             }
             i++;
@@ -553,7 +562,7 @@ public class ResourceDownLoader extends AppFrame {
         try {
             return Files.readAllLines(path);
         } catch (IOException e) {
-            logger.error(e);
+            logger.error("Unable to read urls from file. Details: " + e.getMessage());
             return new ArrayList<>();
         }
     }
@@ -590,7 +599,9 @@ public class ResourceDownLoader extends AppFrame {
                 rd.updateDownloadTime(resourceInfo.getFileInfo(), diffTimeInSec, resourceInfo.getRowNum());
             }
             resourceInfo.markDownload();
-            rd.urlsToDownload.remove(resourceInfo.getUrl());
+            synchronized (ResourceDownLoader.class) {
+                rd.urlsToDownload.remove(resourceInfo.getUrl());
+            }
 
             return true;
         }
@@ -628,36 +639,42 @@ public class ResourceDownLoader extends AppFrame {
         }
 
         @Override
-        public Boolean call() throws Exception {
-            int percent;
+        public Boolean call() {
+            int percent = 0;
             long lastSize = 0, fileSize = fileInfo.getSize();
             String speedStr;
             StringBuilder sbLogInfo;
 
             do {
                 fileInfo.setDownloadStartTime(System.currentTimeMillis());
-                sbLogInfo = new StringBuilder("Status: " + resourceInfo.getFileStatus().getVal());
+                sbLogInfo = new StringBuilder(resourceInfo.nameAndStatus()  );
                 if (resourceInfo.isCancelled()) {
                     rd.logger.log(sbLogInfo.toString());
                     break;
                 }
-                String dest = Utils.hasValue(fileInfo.getFilename()) ? fileInfo.getFilename() : fileInfo.getDest();
-                long size = Files.size(Utils.createPath(dest));
-                sbLogInfo.append(", Downloaded size [").append(size).append("/").append(fileSize).append("]");
-                percent = (int) ((size * 100) / fileSize);
-                resourceInfo.getFileInfo().setDownloadedSize(size);
-                sbLogInfo.append(", percent ").append(percent).append("%");
+                try {
+                    String dest = Utils.hasValue(fileInfo.getFilename()) ? fileInfo.getFilename() : fileInfo.getDestination();
+                    long size = Files.size(Utils.createPath(dest));
+                    sbLogInfo.append(", Downloaded size ")
+                            .append(Utils.getFileSizeString(size)).append("/")
+                            .append(Utils.getFileSizeString(fileSize));
+                    percent = (int) ((size * 100) / fileSize);
+                    resourceInfo.getFileInfo().setDownloadedSize(size);
+                    sbLogInfo.append(", percent [").append(percent).append("%]");
 
-                // Since thread.sleep is 250, so multiplying by 4
-                speedStr = Utils.getFileSizeString((size - lastSize) * 4);
-                lastSize = size;
-                sbLogInfo.append(", Speed ").append(speedStr);
-                rd.updateTitle(percent + "% at " + speedStr);
-                rd.logger.log(sbLogInfo.toString());
+                    // Since thread.sleep is 250, so multiplying by 4, Now trying 1000 so * 1
+                    speedStr = Utils.getFileSizeString(size - lastSize);
+                    lastSize = size;
+                    sbLogInfo.append(", Speed ").append(speedStr);
+                    rd.updateTitle(percent + "% at " + speedStr);
+                    rd.logger.log(sbLogInfo.toString());
+                } catch (Exception e) {
+                    rd.logger.error("Error in downloading file. Details: " + e.getMessage());
+                    break;
+                }
 
                 rd.updateFileStatus(percent, resourceInfo);
-
-                Thread.sleep(250);
+                Utils.sleep(1000);
             } while (percent < 100);
 
             return true;
