@@ -20,6 +20,7 @@ import java.awt.datatransfer.DataFlavor;
 import java.awt.datatransfer.UnsupportedFlavorException;
 import java.awt.event.WindowAdapter;
 import java.awt.event.WindowEvent;
+import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
@@ -323,20 +324,30 @@ public class ResourceDownLoader extends AppFrame {
             fileInfo = new FileInfo(url, extractPath(url), uc.getContentLength());
             logger.log("Url resource size is " + Utils.getFileSizeString(fileInfo.getSize()));
 
-            if (checkIfExists(fileInfo)) {
-                resourceInfo.setFileStatus(FileStatus.EXISTS);
-                setStatusCellValue(FileStatus.EXISTS.getVal(), resourceInfo.getRowNum());
-                synchronized (ResourceDownLoader.class) {
-                    urlsToDownload.remove(resourceInfo.getUrl());
-                }
+            if (fileInfo.getSize() < 0) {
+                resourceInfo.setFileStatus(FileStatus.FAILED);
+                logger.error("Unable to reach url [" + url + "]");
+                markDownloadFailed(resourceInfo);
+                removeFromUrlsToDownload(url);
             } else {
-                rbc = Channels.newChannel(u.openStream());
-                fos = getFOS(fileInfo, resourceInfo.getRowNum());
-                resourceInfo.updateResourceInfo(fos, rbc, fileInfo);
+                boolean exists = checkIfExists(fileInfo);
+                if (exists && sizeMatched(fileInfo)) {
+                    logger.log("File exists with same size for url [" + url + "]");
+                    resourceInfo.setFileStatus(FileStatus.EXISTS);
+                    setStatusCellValue(FileStatus.EXISTS.getVal(), resourceInfo.getRowNum());
+                    removeFromUrlsToDownload(resourceInfo.getUrl());
+                } else {
+                    if (exists) {
+                        logger.log("File exists but not of size from url. Downloading for [" + url + "]");
+                    }
+                    rbc = Channels.newChannel(u.openStream());
+                    fos = getFOS(fileInfo, resourceInfo.getRowNum());
+                    resourceInfo.updateResourceInfo(fos, rbc, fileInfo);
 
-                // ignoring boolean status from Callable
-                threadPool.submit(new DownloadFileCallable(this, resourceInfo));
-                startTracking(resourceInfo);
+                    // ignoring boolean status from Callable
+                    threadPool.submit(new DownloadFileCallable(this, resourceInfo));
+                    startTracking(resourceInfo);
+                }
             }
         } catch (FileNotFoundException e) {
             logger.error("No file at given url. Details: " + e.getMessage());
@@ -349,6 +360,13 @@ public class ResourceDownLoader extends AppFrame {
 
     private boolean checkIfExists(FileInfo fileInfo) {
         return Files.exists(Utils.createPath(fileInfo.getDestination()));
+    }
+
+    // reach here after exists is checked
+    private boolean sizeMatched(FileInfo fileInfo) {
+        boolean result = new File(fileInfo.getDestination()).length() == fileInfo.getSize();
+        logger.log("Result of matching local file size and url file size is [" + result + "]");
+        return result;
     }
 
     private FileOutputStream getFOS(FileInfo fileInfo, int row) throws Exception {
@@ -392,22 +410,24 @@ public class ResourceDownLoader extends AppFrame {
     }
 
     private void markDownloadForError(ResourceInfo info, String msg) {
-        logger.log("Marking cancel in UI for " + info.getUrl());
+        String st = info.getFileStatus() != null ? info.getFileStatus().getVal() : "n/a";
+        logger.log("Marking [" + msg + "] in UI for [" + info.getUrl()
+                + "], Status [" + st + "]");
         int i = info.getRowNum();
         if (isPathMatched(info.getUrl(), i)) {
             String nameVal = tblInfo.getValueAt(i, COLS.NAME.getIdx()).toString();
-            if (canCancel(info.getFileStatus().getVal()) &&
+            boolean takeAction = canCancel(info.getFileStatus().getVal()) &&
                     !nameVal.startsWith(Utils.CANCELLED) &&
-                    !nameVal.startsWith(Utils.FAILED)
-            ) {
-                setCellValue(msg + nameVal, i, COLS.NAME.getIdx());
-            }
+                    !nameVal.startsWith(Utils.FAILED);
+            logger.log("Should take action for url [" + info.getUrl() + "] is taken [" + takeAction + "]");
+            // timer over-rides some time
             setStatusCellValue(info.getFileStatus().getVal(), i);
-
-            if (canCancel(info.getFileStatus().getVal())) {
+            if (takeAction) {
+                setCellValue(msg + nameVal, i, COLS.NAME.getIdx());
                 try {
-                    logger.log("Trying to delete incomplete download for url: " + info.getUrl());
-                    Files.deleteIfExists(Utils.createPath(info.getFileInfo().getDestination()));
+                    boolean result = Files.deleteIfExists(Utils.createPath(info.getFileInfo().getDestination()));
+                    logger.log("Result for trying to delete incomplete download for url ["
+                            + info.getUrl() + "] is [" + result + "]");
                 } catch (NullPointerException | IOException e) {
                     logger.error("File not exists or unable to delete file: " + info.getUrl());
                 }
@@ -472,7 +492,6 @@ public class ResourceDownLoader extends AppFrame {
                     urlsToDownload.forEach((key, ri) -> ri.closeResource());
                 } catch (RuntimeException e) {
                     logger.error("Error in closing resources. Details: " + e.getMessage());
-                    logger.error(e);
                 }
             }
             urlsToDownload.clear();
@@ -613,8 +632,8 @@ public class ResourceDownLoader extends AppFrame {
 
             do {
                 fileInfo.setDownloadStartTime(System.currentTimeMillis());
-                sbLogInfo = new StringBuilder(resourceInfo.nameAndStatus()  );
-                if (resourceInfo.isCancelled()) {
+                sbLogInfo = new StringBuilder(resourceInfo.nameAndStatus());
+                if (resourceInfo.isCancelled() || resourceInfo.exists()) {
                     rd.logger.log(sbLogInfo.toString());
                     break;
                 }
@@ -653,10 +672,13 @@ public class ResourceDownLoader extends AppFrame {
     }
 
     public void removeFromUrlsToDownload(String key) {
-        urlsToDownload.remove(key);
+        synchronized (ResourceDownLoader.class) {
+            urlsToDownload.remove(key);
+        }
+        logger.log("Removed url [" + key + "] from download.");
     }
 
-    public void log (String m) {
+    public void log(String m) {
         logger.log(m);
     }
 

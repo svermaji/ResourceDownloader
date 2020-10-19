@@ -72,6 +72,7 @@ public class ResourceInfo {
     }
 
     public void closeResource() {
+        logger.log("in close rsc");
         if (canMarkCancelled(fileStatus)) {
             logger.log("Marking status cancel for " + getUrl());
             synchronized (ResourceInfo.class) {
@@ -97,12 +98,11 @@ public class ResourceInfo {
 
     private boolean canMarkCancelled(FileStatus fileStatus) {
         return !fileStatus.equals(FileStatus.DOWNLOADED) &&
-                !fileStatus.equals(FileStatus.EXISTS) &&
-                !fileStatus.equals(FileStatus.FAILED);
+                !exists() && !isFailed();
     }
 
     public void markDownload() {
-        if (fileStatus != FileStatus.CANCELLED) {
+        if (!isCancelled()) {
             fileStatus = FileStatus.DOWNLOADED;
         }
         logger.log(nameAndStatus());
@@ -135,4 +135,3 @@ public class ResourceInfo {
         return fileStatus.equals(FileStatus.EXISTS);
     }
 }
-

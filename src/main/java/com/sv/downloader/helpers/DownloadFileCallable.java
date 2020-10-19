@@ -35,9 +35,7 @@ public class DownloadFileCallable implements Callable<Boolean> {
             rd.updateDownloadTime(resourceInfo.getFileInfo(), diffTimeInSec, resourceInfo.getRowNum());
         }
         resourceInfo.markDownload();
-        synchronized (ResourceDownLoader.class) {
-            rd.removeFromUrlsToDownload(resourceInfo.getUrl());
-        }
+        rd.removeFromUrlsToDownload(resourceInfo.getUrl());
 
         return true;
     }
