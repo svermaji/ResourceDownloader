@@ -651,7 +651,9 @@ public class ResourceDownLoader extends AppFrame {
                     speedStr = Utils.getFileSizeString(size - lastSize);
                     lastSize = size;
                     sbLogInfo.append(", Speed ").append(speedStr);
-                    rd.updateTitle(percent + "% at " + speedStr);
+                    if (!rd.isUrlsToDownloadEmpty()) {
+                        rd.updateTitle(percent + "% at " + speedStr);
+                    }
                     rd.logger.log(sbLogInfo.toString());
                 } catch (Exception e) {
                     rd.logger.error("Error in downloading file. Details: " + e.getMessage());
@@ -671,6 +673,7 @@ public class ResourceDownLoader extends AppFrame {
         return urlsToDownload.isEmpty();
     }
 
+    //TODO: check title after success download
     public void removeFromUrlsToDownload(String key) {
         synchronized (ResourceDownLoader.class) {
             urlsToDownload.remove(key);

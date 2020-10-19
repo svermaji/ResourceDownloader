@@ -72,9 +72,8 @@ public class ResourceInfo {
     }
 
     public void closeResource() {
-        logger.log("in close rsc");
+        logger.log("Closing resources for [" + getUrl() + "]");
         if (canMarkCancelled(fileStatus)) {
-            logger.log("Marking status cancel for " + getUrl());
             synchronized (ResourceInfo.class) {
                 fileStatus = FileStatus.CANCELLED;
             }
@@ -92,8 +91,11 @@ public class ResourceInfo {
         } catch (IOException e) {
             logger.error(e);
         }
-        // first close resource then try to delete
-        rdl.markDownloadCancelled(this);
+
+        if (fileStatus != FileStatus.DOWNLOADED) {
+            // first close resource then try to delete
+            rdl.markDownloadCancelled(this);
+        }
     }
 
     private boolean canMarkCancelled(FileStatus fileStatus) {
