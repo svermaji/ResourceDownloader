@@ -680,7 +680,7 @@ public class ResourceDownLoader extends AppFrame {
         }
         logger.log("Removed url [" + key + "] from download.");
         if (urlsToDownload.size() == 0) {
-            updateTitle("All urls processed.");
+            updateTitle("Done !!");
         }
     }
 
