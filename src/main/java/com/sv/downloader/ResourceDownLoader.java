@@ -676,6 +676,9 @@ public class ResourceDownLoader extends AppFrame {
             urlsToDownload.remove(key);
         }
         logger.log("Removed url [" + key + "] from download.");
+        if (urlsToDownload.size() == 0) {
+            updateTitle("All urls processed.");
+        }
     }
 
     public void log(String m) {
