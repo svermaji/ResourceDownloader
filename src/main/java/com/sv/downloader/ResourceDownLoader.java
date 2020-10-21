@@ -36,6 +36,9 @@ import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
+import static com.sv.core.Constants.*;
+import static com.sv.swingui.UIConstants.*;
+
 /**
  * This class will help in downloading bunch of urls that
  * may point to resource like images, pdfs etc.
@@ -179,12 +182,12 @@ public class ResourceDownLoader extends AppFrame {
 
         createTable();
         JScrollPane jspTable = new JScrollPane(tblInfo);
-        jspTable.setBorder(SwingUtils.EMPTY_BORDER);
+        jspTable.setBorder(EMPTY_BORDER);
 
         taUrls = new JTextArea(getUrls(), 5, 1);
-        taUrls.setBorder(SwingUtils.BLUE_BORDER);
+        taUrls.setBorder(BLUE_BORDER);
         JScrollPane jspUrls = new JScrollPane(taUrls);
-        jspUrls.setBorder(SwingUtils.EMPTY_BORDER);
+        jspUrls.setBorder(EMPTY_BORDER);
 
         JPanel jpUrls = new JPanel(new BorderLayout());
         jpUrls.add(new JLabel(" Urls to download"), BorderLayout.NORTH);
@@ -221,7 +224,7 @@ public class ResourceDownLoader extends AppFrame {
                 int result = JOptionPane.showConfirmDialog(this,
                         "Use data [" +
                                 (data.length() < showDataLimit ? data :
-                                        data.substring(0, showDataLimit) + Utils.ELLIPSIS)
+                                        data.substring(0, showDataLimit) + ELLIPSIS)
                                 + "]",
                         "Copy data from clipboard ?",
                         JOptionPane.YES_NO_OPTION,
@@ -257,7 +260,7 @@ public class ResourceDownLoader extends AppFrame {
         createDefaultRows();
 
         tblInfo = new AppTable(model);
-        tblInfo.setBorder(SwingUtils.BLUE_BORDER);
+        tblInfo.setBorder(BLUE_BORDER);
 
         CellRendererLeftAlign leftRenderer = new CellRendererLeftAlign();
         CellRendererCenterAlign centerRenderer = new CellRendererCenterAlign();
@@ -403,12 +406,12 @@ public class ResourceDownLoader extends AppFrame {
 
     public void markDownloadFailed(ResourceInfo info) {
         info.markFailed ();
-        markDownloadForError(info, Utils.FAILED);
+        markDownloadForError(info, FAILED);
     }
 
     public void markDownloadCancelled(ResourceInfo info) {
         info.markCancel ();
-        markDownloadForError(info, Utils.CANCELLED);
+        markDownloadForError(info, CANCELLED);
     }
 
     private void markDownloadForError(ResourceInfo info, String msg) {
@@ -418,8 +421,8 @@ public class ResourceDownLoader extends AppFrame {
         if (isPathMatched(info.getUrl(), i)) {
             String nameVal = tblInfo.getValueAt(i, COLS.NAME.getIdx()).toString();
             boolean takeAction = canCancel(info.getFileStatus().getVal()) &&
-                    !nameVal.startsWith(Utils.CANCELLED) &&
-                    !nameVal.startsWith(Utils.FAILED);
+                    !nameVal.startsWith(CANCELLED) &&
+                    !nameVal.startsWith(FAILED);
             logger.log("For url [" + info.getOnlyName() + "], decision to try deleting incomplete download [" + takeAction + "]");
             // timer over-rides some time
             setStatusCellValue(info.getFileStatus().getVal(), i);
@@ -467,7 +470,7 @@ public class ResourceDownLoader extends AppFrame {
 
     private String extractPath(String url) {
         return extractPathFromName(
-                url.substring(url.lastIndexOf(Utils.F_SLASH) + Utils.F_SLASH.length())
+                url.substring(url.lastIndexOf(F_SLASH) + F_SLASH.length())
         );
     }
 
