@@ -322,7 +322,7 @@ public class ResourceDownLoader extends AppFrame {
             URL u = new URL(url);
             URLConnection uc = u.openConnection();
             fileInfo = new FileInfo(url, extractPath(url), uc.getContentLength());
-            logger.log("Url resource size is " + Utils.getFileSizeString(fileInfo.getSize()));
+            logger.log("Url [" + Utils.getFileName(url) + "] resource size is " + Utils.getFileSizeString(fileInfo.getSize()));
 
             if (fileInfo.getSize() < 0) {
                 resourceInfo.setFileStatus(FileStatus.FAILED);
@@ -402,32 +402,33 @@ public class ResourceDownLoader extends AppFrame {
     }
 
     public void markDownloadFailed(ResourceInfo info) {
+        info.markFailed ();
         markDownloadForError(info, Utils.FAILED);
     }
 
     public void markDownloadCancelled(ResourceInfo info) {
+        info.markCancel ();
         markDownloadForError(info, Utils.CANCELLED);
     }
 
     private void markDownloadForError(ResourceInfo info, String msg) {
-        String st = info.getFileStatus() != null ? info.getFileStatus().getVal() : "n/a";
-        logger.log("Marking [" + msg + "] in UI for [" + info.getUrl()
-                + "], Status [" + st + "]");
+        removeFromUrlsToDownload(info.getUrl());
+        logger.log("Marking [" + msg + "] in UI for " + info.nameAndStatus());
         int i = info.getRowNum();
         if (isPathMatched(info.getUrl(), i)) {
             String nameVal = tblInfo.getValueAt(i, COLS.NAME.getIdx()).toString();
             boolean takeAction = canCancel(info.getFileStatus().getVal()) &&
                     !nameVal.startsWith(Utils.CANCELLED) &&
                     !nameVal.startsWith(Utils.FAILED);
-            logger.log("Should take action for url [" + info.getUrl() + "] is taken [" + takeAction + "]");
+            logger.log("For url [" + info.getOnlyName() + "], decision to try deleting incomplete download [" + takeAction + "]");
             // timer over-rides some time
             setStatusCellValue(info.getFileStatus().getVal(), i);
             if (takeAction) {
                 setCellValue(msg + nameVal, i, COLS.NAME.getIdx());
                 try {
                     boolean result = Files.deleteIfExists(Utils.createPath(info.getFileInfo().getDestination()));
-                    logger.log("Result for trying to delete incomplete download for url ["
-                            + info.getUrl() + "] is [" + result + "]");
+                    logger.log("Result for trying to delete incomplete download for ["
+                            + info.getOnlyName() + "] is [" + result + "]");
                 } catch (NullPointerException | IOException e) {
                     logger.error("File not exists or unable to delete file: " + info.getUrl());
                 }
@@ -531,7 +532,8 @@ public class ResourceDownLoader extends AppFrame {
                 }
             });
         }
-        logger.log("Downloading urls are " + urlsToDownload.keySet());
+        logger.log("Urls to download are [" + urlsToDownload.size()
+                + "]. Urls are " + urlsToDownload.keySet());
 
         createRowsInTable(urlsToDownload);
         threadPool.submit(new StartDownloadCallable(this, urlsToDownload));
@@ -550,18 +552,18 @@ public class ResourceDownLoader extends AppFrame {
         int i = 0;
         for (Map.Entry<String, ResourceInfo> entry : urlsToDownload.entrySet()) {
             String k = entry.getKey();
-            // cannot use onlyname variable as ResourceInfo not initialized completely
-            entry.getValue().setRowNum(i);
+            ResourceInfo v = entry.getValue();
+            v.setRowNum(i);
             if (i < DEFAULT_NUM_ROWS) {
                 setCellValue(k, i, COLS.PATH.getIdx());
                 setCellValue(i + 1, i, COLS.IDX.getIdx());
-                setCellValue(Utils.getFileName(k), i, COLS.NAME.getIdx());
+                setCellValue(v.getOnlyName(), i, COLS.NAME.getIdx());
                 setCellValue(FileStatus.IN_QUEUE.getVal(), i, COLS.STATUS.getIdx());
                 setCellValue(0, i, COLS.PERCENT.getIdx());
                 setCellValue(0, i, COLS.TIME.getIdx());
             } else {
                 // maintain the order
-                String[] row = {k, (i + 1) + "", Utils.getFileName(k), "0", "0"};
+                String[] row = {k, (i + 1) + "", v.getOnlyName(), "0", "0"};
                 model.addRow(row);
             }
             i++;
@@ -617,7 +619,7 @@ public class ResourceDownLoader extends AppFrame {
         private final ResourceDownLoader rd;
 
         DownloadStatusCallable(ResourceDownLoader rd, ResourceInfo resourceInfo) {
-            rd.logger.log("Download status tracking start for " + resourceInfo.getUrl());
+            rd.logger.log("Download status tracking start for " + resourceInfo.getOnlyName());
             this.resourceInfo = resourceInfo;
             this.fileInfo = resourceInfo.getFileInfo();
             this.rd = rd;

@@ -7,7 +7,6 @@ import java.util.concurrent.TimeUnit;
 public class FileInfo {
     private final String src, destination;
     private String filename = null;
-    private String onlyName = null;
     private final long size;
     private long downloadedSize = 0;
     private long downloadStartTime = 0;
@@ -16,12 +15,7 @@ public class FileInfo {
     public FileInfo(String src, String destination, int size) {
         this.src = src;
         this.destination = destination;
-        this.onlyName = Utils.getFileName(destination);
         this.size = size;
-    }
-
-    public String getOnlyName() {
-        return onlyName;
     }
 
     public String getSrc() {
