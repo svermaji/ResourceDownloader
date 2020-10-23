@@ -1,11 +1,13 @@
 package com.sv.downloader;
 
-import com.sv.core.DefaultConfigs;
-import com.sv.core.MyLogger;
+import com.sv.core.config.DefaultConfigs;
+import com.sv.core.logger.MyLogger;
 import com.sv.core.Utils;
 import com.sv.downloader.helpers.DownloadFileCallable;
 import com.sv.downloader.helpers.TrackAllDownloadsCallable;
 import com.sv.swingui.*;
+import com.sv.swingui.component.*;
+import com.sv.swingui.component.table.*;
 
 import javax.net.ssl.HttpsURLConnection;
 import javax.net.ssl.SSLContext;
@@ -320,8 +322,8 @@ public class ResourceDownLoader extends AppFrame {
         FileOutputStream fos;
         FileInfo fileInfo;
         try {
-            logger.log("Starting overall tracking...");
             threadPool.submit(new TrackAllDownloadsCallable(this));
+            logger.log("Tracking initiated...");
             URL u = new URL(url);
             URLConnection uc = u.openConnection();
             fileInfo = new FileInfo(url, extractPath(url), uc.getContentLength());
@@ -666,7 +668,7 @@ public class ResourceDownLoader extends AppFrame {
                 }
 
                 rd.updateFileStatus(percent, resourceInfo);
-                Utils.sleep(1000);
+                Utils.sleep1Sec();
             } while (percent < 100);
 
             return true;

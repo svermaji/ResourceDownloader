@@ -1,6 +1,7 @@
 package com.sv.downloader;
 
-import com.sv.core.MyLogger;
+import com.sv.core.exception.AppException;
+import com.sv.core.logger.MyLogger;
 import com.sv.core.Utils;
 
 import java.io.FileOutputStream;
@@ -16,7 +17,7 @@ public class ResourceInfo {
     private static MyLogger logger;
     private final String url;
     private final ResourceDownLoader rdl;
-    private String onlyName;
+    private final String onlyName;
 
     public ResourceInfo(String url, MyLogger myLogger, ResourceDownLoader rdl) {
         this.url = url;
@@ -31,7 +32,7 @@ public class ResourceInfo {
     public void updateResourceInfo(FileOutputStream fos, ReadableByteChannel rbc, FileInfo fileInfo) {
         if (!url.equals(fileInfo.getSrc())) {
             logger.log(url + " mismatched with " + fileInfo);
-            throw new ResourceDownLoaderException("Url and file information mismatch");
+            throw new AppException("Url and file information mismatch");
         }
         this.fos = fos;
         this.rbc = rbc;
