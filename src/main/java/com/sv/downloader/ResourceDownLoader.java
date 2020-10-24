@@ -225,9 +225,9 @@ public class ResourceDownLoader extends AppFrame {
             if (Utils.hasValue(data) && !data.equals(lastClipboardText)) {
                 int result = JOptionPane.showConfirmDialog(this,
                         "Use data [" +
+                                Utils.applyBraces(
                                 (data.length() < showDataLimit ? data :
-                                        data.substring(0, showDataLimit) + ELLIPSIS)
-                                + "]",
+                                        data.substring(0, showDataLimit) + ELLIPSIS)),
                         "Copy data from clipboard ?",
                         JOptionPane.YES_NO_OPTION,
                         JOptionPane.QUESTION_MESSAGE);
@@ -317,7 +317,7 @@ public class ResourceDownLoader extends AppFrame {
 
     private void downLoad(ResourceInfo resourceInfo) {
         String url = resourceInfo.getUrl();
-        logger.log("Trying url [" + url + "]");
+        logger.log("Trying url " + Utils.applyBraces(url));
         ReadableByteChannel rbc;
         FileOutputStream fos;
         FileInfo fileInfo;
@@ -325,25 +325,26 @@ public class ResourceDownLoader extends AppFrame {
             threadPool.submit(new TrackAllDownloadsCallable(this));
             logger.log("Tracking initiated...");
             URL u = new URL(url);
+            String urlWithBraces =  Utils.applyBraces(url);
             URLConnection uc = u.openConnection();
             fileInfo = new FileInfo(url, extractPath(url), uc.getContentLength());
             logger.log("Url [" + Utils.getFileName(url) + "] resource size is " + Utils.getFileSizeString(fileInfo.getSize()));
 
             if (fileInfo.getSize() < 0) {
                 resourceInfo.setFileStatus(FileStatus.FAILED);
-                logger.error("Unable to reach url [" + url + "]");
+                logger.error("Unable to reach url " + urlWithBraces);
                 markDownloadFailed(resourceInfo);
                 removeFromUrlsToDownload(url);
             } else {
                 boolean exists = checkIfExists(fileInfo);
                 if (exists && sizeMatched(fileInfo)) {
-                    logger.log("File exists with same size for url [" + url + "]");
+                    logger.log("File exists with same size for url " + urlWithBraces);
                     resourceInfo.setFileStatus(FileStatus.EXISTS);
                     setStatusCellValue(FileStatus.EXISTS.getVal(), resourceInfo.getRowNum());
                     removeFromUrlsToDownload(resourceInfo.getUrl());
                 } else {
                     if (exists) {
-                        logger.log("File exists but not of size from url. Downloading for [" + url + "]");
+                        logger.log("File exists but not of size from url. Downloading for " + urlWithBraces);
                     }
                     rbc = Channels.newChannel(u.openStream());
                     fos = getFOS(fileInfo, resourceInfo.getRowNum());
@@ -370,7 +371,7 @@ public class ResourceDownLoader extends AppFrame {
     // reach here after exists is checked
     private boolean sizeMatched(FileInfo fileInfo) {
         boolean result = new File(fileInfo.getDestination()).length() == fileInfo.getSize();
-        logger.log("Result of matching local file size and url file size is [" + result + "]");
+        logger.log("Result of matching local file size and url file size is " + Utils.applyBraces(result+""));
         return result;
     }
 
@@ -394,7 +395,7 @@ public class ResourceDownLoader extends AppFrame {
     }
 
     private String extractFileNameFromCD(String cdStr) {
-        logger.log("Content disposition from url obtained as [" + cdStr + "]");
+        logger.log("Content disposition from url obtained as " + Utils.applyBraces(cdStr));
         String FN_STR = "filename=\"";
         if (cdStr.contains(FN_STR)) {
             cdStr = cdStr.substring(cdStr.indexOf(FN_STR) + FN_STR.length());
@@ -402,7 +403,7 @@ public class ResourceDownLoader extends AppFrame {
                 cdStr = cdStr.substring(0, cdStr.indexOf("\""));
             }
         }
-        logger.log("Returning name extracted from content disposition as [" + cdStr + "]");
+        logger.log("Returning name extracted from content disposition as " + Utils.applyBraces(cdStr));
         return cdStr;
     }
 
@@ -485,7 +486,7 @@ public class ResourceDownLoader extends AppFrame {
             name = "\\" + name;
         }
         String path = destFolder + name;
-        logger.log("Destination path is [" + path + "]");
+        logger.log("Destination path is [" + Utils.applyBraces(path));
         return path;
     }
 
@@ -680,7 +681,6 @@ public class ResourceDownLoader extends AppFrame {
         return urlsToDownload.isEmpty();
     }
 
-    //TODO: check title after success download
     public void removeFromUrlsToDownload(String key) {
         synchronized (ResourceDownLoader.class) {
             urlsToDownload.remove(key);

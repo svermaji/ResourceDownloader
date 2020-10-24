@@ -24,14 +24,14 @@ public class DownloadFileCallable implements Callable<Boolean> {
     public Boolean call() throws Exception {
         long startTime = System.currentTimeMillis();
 
-        rd.log("Starting download for " + resourceInfo);
+        rd.log("Download start for " + resourceInfo);
         resourceInfo.getFos().getChannel().transferFrom
                 (resourceInfo.getRbc(), 0, resourceInfo.getFileInfo().getSize());
         if (rd.isDownloadable(resourceInfo)) {
             long diffTime = (System.currentTimeMillis() - startTime);
             long diffTimeInSec = TimeUnit.MILLISECONDS.toSeconds(diffTime);
             resourceInfo.getFileInfo().setDownloadInSec(diffTimeInSec);
-            rd.log("download complete for " + resourceInfo);
+            rd.log("Download complete for " + resourceInfo);
             rd.updateDownloadTime(resourceInfo.getFileInfo(), diffTimeInSec, resourceInfo.getRowNum());
         }
         resourceInfo.markDownload();

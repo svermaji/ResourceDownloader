@@ -9,15 +9,18 @@ import java.io.IOException;
 import java.nio.channels.ReadableByteChannel;
 
 public class ResourceInfo {
+
+    private static MyLogger logger;
+
+    private final String url;
+    private final ResourceDownLoader rdl;
+    private final String onlyName;
+
     private FileOutputStream fos;
     private ReadableByteChannel rbc;
     private FileInfo fileInfo;
     private FileStatus fileStatus;
     private int rowNum;
-    private static MyLogger logger;
-    private final String url;
-    private final ResourceDownLoader rdl;
-    private final String onlyName;
 
     public ResourceInfo(String url, MyLogger myLogger, ResourceDownLoader rdl) {
         this.url = url;
@@ -120,13 +123,13 @@ public class ResourceInfo {
     }
 
     public void markCancel() {
-        if (fileStatus != FileStatus.DOWNLOADED && fileStatus != FileStatus.FAILED){
+        if (fileStatus != FileStatus.DOWNLOADED && fileStatus != FileStatus.FAILED) {
             fileStatus = FileStatus.CANCELLED;
         }
     }
 
     public void markFailed() {
-        if (fileStatus != FileStatus.DOWNLOADED && fileStatus != FileStatus.CANCELLED){
+        if (fileStatus != FileStatus.DOWNLOADED && fileStatus != FileStatus.CANCELLED) {
             fileStatus = FileStatus.FAILED;
         }
     }
