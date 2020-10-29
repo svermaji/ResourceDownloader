@@ -236,7 +236,7 @@ public class ResourceDownLoader extends AppFrame {
                 }
                 lastClipboardText = data;
             }
-        } catch (UnsupportedFlavorException | IOException e) {
+        } catch (Exception e) {
             logger.error("Unable to complete clipboard check action.  Error: " + e.getMessage());
         }
     }
