@@ -225,7 +225,7 @@ public class ResourceDownLoader extends AppFrame {
             if (Utils.hasValue(data) && !data.equals(lastClipboardText)) {
                 int result = JOptionPane.showConfirmDialog(this,
                         "Use data [" +
-                                Utils.applyBraces(
+                                Utils.addBraces(
                                 (data.length() < showDataLimit ? data :
                                         data.substring(0, showDataLimit) + ELLIPSIS)),
                         "Copy data from clipboard ?",
@@ -317,7 +317,7 @@ public class ResourceDownLoader extends AppFrame {
 
     private void downLoad(ResourceInfo resourceInfo) {
         String url = resourceInfo.getUrl();
-        logger.log("Trying url " + Utils.applyBraces(url));
+        logger.log("Trying url " + Utils.addBraces(url));
         ReadableByteChannel rbc;
         FileOutputStream fos;
         FileInfo fileInfo;
@@ -325,7 +325,7 @@ public class ResourceDownLoader extends AppFrame {
             threadPool.submit(new TrackAllDownloadsCallable(this));
             logger.log("Tracking initiated...");
             URL u = new URL(url);
-            String urlWithBraces =  Utils.applyBraces(url);
+            String urlWithBraces =  Utils.addBraces(url);
             URLConnection uc = u.openConnection();
             fileInfo = new FileInfo(url, extractPath(url), uc.getContentLength());
             logger.log("Url [" + Utils.getFileName(url) + "] resource size is " + Utils.getFileSizeString(fileInfo.getSize()));
@@ -371,7 +371,7 @@ public class ResourceDownLoader extends AppFrame {
     // reach here after exists is checked
     private boolean sizeMatched(FileInfo fileInfo) {
         boolean result = new File(fileInfo.getDestination()).length() == fileInfo.getSize();
-        logger.log("Result of matching local file size and url file size is " + Utils.applyBraces(result+""));
+        logger.log("Result of matching local file size and url file size is " + Utils.addBraces(result+""));
         return result;
     }
 
@@ -395,7 +395,7 @@ public class ResourceDownLoader extends AppFrame {
     }
 
     private String extractFileNameFromCD(String cdStr) {
-        logger.log("Content disposition from url obtained as " + Utils.applyBraces(cdStr));
+        logger.log("Content disposition from url obtained as " + Utils.addBraces(cdStr));
         String FN_STR = "filename=\"";
         if (cdStr.contains(FN_STR)) {
             cdStr = cdStr.substring(cdStr.indexOf(FN_STR) + FN_STR.length());
@@ -403,7 +403,7 @@ public class ResourceDownLoader extends AppFrame {
                 cdStr = cdStr.substring(0, cdStr.indexOf("\""));
             }
         }
-        logger.log("Returning name extracted from content disposition as " + Utils.applyBraces(cdStr));
+        logger.log("Returning name extracted from content disposition as " + Utils.addBraces(cdStr));
         return cdStr;
     }
 
@@ -486,7 +486,7 @@ public class ResourceDownLoader extends AppFrame {
             name = "\\" + name;
         }
         String path = destFolder + name;
-        logger.log("Destination path is [" + Utils.applyBraces(path));
+        logger.log("Destination path is [" + Utils.addBraces(path));
         return path;
     }
 
@@ -648,17 +648,17 @@ public class ResourceDownLoader extends AppFrame {
                 try {
                     String dest = Utils.hasValue(fileInfo.getFilename()) ? fileInfo.getFilename() : fileInfo.getDestination();
                     long size = Files.size(Utils.createPath(dest));
-                    sbLogInfo.append(", Downloaded size ")
+                    sbLogInfo.append(", size ")
                             .append(Utils.getFileSizeString(size)).append("/")
                             .append(Utils.getFileSizeString(fileSize));
                     percent = (int) ((size * 100) / fileSize);
                     resourceInfo.getFileInfo().setDownloadedSize(size);
-                    sbLogInfo.append(", percent [").append(percent).append("%]");
+                    sbLogInfo.append(", [").append(percent).append("%]");
 
                     // Since thread.sleep is 250, so multiplying by 4, Now trying 1000 so * 1
                     speedStr = Utils.getFileSizeString(size - lastSize);
                     lastSize = size;
-                    sbLogInfo.append(", Speed ").append(speedStr);
+                    sbLogInfo.append(", @ ").append(speedStr);
                     if (!rd.isUrlsToDownloadEmpty()) {
                         rd.updateTitle(percent + "% at " + speedStr);
                     }
