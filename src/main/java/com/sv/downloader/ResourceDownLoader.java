@@ -658,7 +658,7 @@ public class ResourceDownLoader extends AppFrame {
                     // Since thread.sleep is 250, so multiplying by 4, Now trying 1000 so * 1
                     speedStr = Utils.getFileSizeString(size - lastSize);
                     lastSize = size;
-                    sbLogInfo.append(", @ ").append(speedStr);
+                    sbLogInfo.append(" @ ").append(speedStr);
                     if (!rd.isUrlsToDownloadEmpty()) {
                         rd.updateTitle(percent + "% at " + speedStr);
                     }
