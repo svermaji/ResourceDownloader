@@ -1,13 +1,19 @@
 package com.sv.downloader;
 
+import com.sv.core.Utils;
 import com.sv.core.config.DefaultConfigs;
 import com.sv.core.logger.MyLogger;
-import com.sv.core.Utils;
 import com.sv.downloader.helpers.DownloadFileCallable;
 import com.sv.downloader.helpers.TrackAllDownloadsCallable;
-import com.sv.swingui.*;
-import com.sv.swingui.component.*;
-import com.sv.swingui.component.table.*;
+import com.sv.swingui.SwingUtils;
+import com.sv.swingui.component.AppButton;
+import com.sv.swingui.component.AppExitButton;
+import com.sv.swingui.component.AppFrame;
+import com.sv.swingui.component.AppLabel;
+import com.sv.swingui.component.table.AppTable;
+import com.sv.swingui.component.table.CellRendererCenterAlign;
+import com.sv.swingui.component.table.CellRendererLeftAlign;
+import com.sv.swingui.component.table.CellRendererProgressBar;
 
 import javax.net.ssl.HttpsURLConnection;
 import javax.net.ssl.SSLContext;
@@ -19,7 +25,6 @@ import javax.swing.table.TableColumn;
 import java.awt.*;
 import java.awt.datatransfer.Clipboard;
 import java.awt.datatransfer.DataFlavor;
-import java.awt.datatransfer.UnsupportedFlavorException;
 import java.awt.event.WindowAdapter;
 import java.awt.event.WindowEvent;
 import java.io.File;
@@ -39,7 +44,8 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
 import static com.sv.core.Constants.*;
-import static com.sv.swingui.UIConstants.*;
+import static com.sv.swingui.UIConstants.BLUE_BORDER;
+import static com.sv.swingui.UIConstants.EMPTY_BORDER;
 
 /**
  * This class will help in downloading bunch of urls that
@@ -719,7 +725,7 @@ public class ResourceDownLoader extends AppFrame {
     }
 
     private boolean isPathMatched(String src, int row) {
-        return tblInfo.getValueAt(row, COLS.PATH.getIdx()).toString().equals(src);
+        return Utils.hasValue(src) && tblInfo.getValueAt(row, COLS.PATH.getIdx()).toString().equals(src);
     }
 
     private String getDownloadSize(FileInfo fileInfo) {
