@@ -212,7 +212,7 @@ public class ResourceDownLoader extends AppFrame {
         setToCenter();
         setSize(getWidth(), getHeight() / 2);
         this.setLocationRelativeTo(null);
-        logger.log("Program initialized");
+        logger.info("Program initialized");
     }
 
     public void copyClipboard() {
@@ -301,7 +301,7 @@ public class ResourceDownLoader extends AppFrame {
     private void exitForm() {
         cancelDownLoad();
         configs.saveConfig(this);
-        logger.log("Goodbye");
+        logger.info("Goodbye");
         logger.dispose();
         setVisible(false);
         dispose();
@@ -317,18 +317,18 @@ public class ResourceDownLoader extends AppFrame {
 
     private void downLoad(ResourceInfo resourceInfo) {
         String url = resourceInfo.getUrl();
-        logger.log("Trying url " + Utils.addBraces(url));
+        logger.info("Trying url " + Utils.addBraces(url));
         ReadableByteChannel rbc;
         FileOutputStream fos;
         FileInfo fileInfo;
         try {
             threadPool.submit(new TrackAllDownloadsCallable(this));
-            logger.log("Tracking initiated...");
+            logger.info("Tracking initiated...");
             URL u = new URL(url);
             String urlWithBraces =  Utils.addBraces(url);
             URLConnection uc = u.openConnection();
             fileInfo = new FileInfo(url, extractPath(url), uc.getContentLength());
-            logger.log("Url [" + Utils.getFileName(url) + "] resource size is " + Utils.getFileSizeString(fileInfo.getSize()));
+            logger.info("Url [" + Utils.getFileName(url) + "] resource size is " + Utils.getFileSizeString(fileInfo.getSize()));
 
             if (fileInfo.getSize() < 0) {
                 resourceInfo.setFileStatus(FileStatus.FAILED);
@@ -338,13 +338,13 @@ public class ResourceDownLoader extends AppFrame {
             } else {
                 boolean exists = checkIfExists(fileInfo);
                 if (exists && sizeMatched(fileInfo)) {
-                    logger.log("File exists with same size for url " + urlWithBraces);
+                    logger.info("File exists with same size for url " + urlWithBraces);
                     resourceInfo.setFileStatus(FileStatus.EXISTS);
                     setStatusCellValue(FileStatus.EXISTS.getVal(), resourceInfo.getRowNum());
                     removeFromUrlsToDownload(resourceInfo.getUrl());
                 } else {
                     if (exists) {
-                        logger.log("File exists but not of size from url. Downloading for " + urlWithBraces);
+                        logger.info("File exists but not of size from url. Downloading for " + urlWithBraces);
                     }
                     rbc = Channels.newChannel(u.openStream());
                     fos = getFOS(fileInfo, resourceInfo.getRowNum());
@@ -371,7 +371,7 @@ public class ResourceDownLoader extends AppFrame {
     // reach here after exists is checked
     private boolean sizeMatched(FileInfo fileInfo) {
         boolean result = new File(fileInfo.getDestination()).length() == fileInfo.getSize();
-        logger.log("Result of matching local file size and url file size is " + Utils.addBraces(result+""));
+        logger.info("Result of matching local file size and url file size is " + Utils.addBraces(result+""));
         return result;
     }
 
@@ -395,7 +395,7 @@ public class ResourceDownLoader extends AppFrame {
     }
 
     private String extractFileNameFromCD(String cdStr) {
-        logger.log("Content disposition from url obtained as " + Utils.addBraces(cdStr));
+        logger.info("Content disposition from url obtained as " + Utils.addBraces(cdStr));
         String FN_STR = "filename=\"";
         if (cdStr.contains(FN_STR)) {
             cdStr = cdStr.substring(cdStr.indexOf(FN_STR) + FN_STR.length());
@@ -403,7 +403,7 @@ public class ResourceDownLoader extends AppFrame {
                 cdStr = cdStr.substring(0, cdStr.indexOf("\""));
             }
         }
-        logger.log("Returning name extracted from content disposition as " + Utils.addBraces(cdStr));
+        logger.info("Returning name extracted from content disposition as " + Utils.addBraces(cdStr));
         return cdStr;
     }
 
@@ -419,21 +419,21 @@ public class ResourceDownLoader extends AppFrame {
 
     private void markDownloadForError(ResourceInfo info, String msg) {
         removeFromUrlsToDownload(info.getUrl());
-        logger.log("Marking [" + msg + "] in UI for " + info.nameAndStatus());
+        logger.info("Marking [" + msg + "] in UI for " + info.nameAndStatus());
         int i = info.getRowNum();
         if (isPathMatched(info.getUrl(), i)) {
             String nameVal = tblInfo.getValueAt(i, COLS.NAME.getIdx()).toString();
             boolean takeAction = canCancel(info.getFileStatus().getVal()) &&
                     !nameVal.startsWith(CANCELLED) &&
                     !nameVal.startsWith(FAILED);
-            logger.log("For url [" + info.getOnlyName() + "], decision to try deleting incomplete download [" + takeAction + "]");
+            logger.info("For url [" + info.getOnlyName() + "], decision to try deleting incomplete download [" + takeAction + "]");
             // timer over-rides some time
             setStatusCellValue(info.getFileStatus().getVal(), i);
             if (takeAction) {
                 setCellValue(msg + nameVal, i, COLS.NAME.getIdx());
                 try {
                     boolean result = Files.deleteIfExists(Utils.createPath(info.getFileInfo().getDestination()));
-                    logger.log("Result for trying to delete incomplete download for ["
+                    logger.info("Result for trying to delete incomplete download for ["
                             + info.getOnlyName() + "] is [" + result + "]");
                 } catch (NullPointerException | IOException e) {
                     logger.error("File not exists or unable to delete file: " + info.getUrl());
@@ -486,14 +486,14 @@ public class ResourceDownLoader extends AppFrame {
             name = "\\" + name;
         }
         String path = destFolder + name;
-        logger.log("Destination path is [" + Utils.addBraces(path));
+        logger.info("Destination path is [" + Utils.addBraces(path));
         return path;
     }
 
     private void cancelDownLoad() {
         disableCancelButton();
         if (!isUrlsToDownloadEmpty()) {
-            logger.log("Cancelling all downloads. Remaining downloads: " + urlsToDownload.size());
+            logger.info("Cancelling all downloads. Remaining downloads: " + urlsToDownload.size());
             synchronized (ResourceDownLoader.class) {
                 try {
                     urlsToDownload.forEach((key, ri) -> ri.closeResource());
@@ -505,7 +505,7 @@ public class ResourceDownLoader extends AppFrame {
             enableControls();
             updateTitle("Cancelled download!!");
 
-            logger.log("Cancelling done.");
+            logger.info("Cancelling done.");
         }
         enableCancelButton();
     }
@@ -538,7 +538,7 @@ public class ResourceDownLoader extends AppFrame {
                 }
             });
         }
-        logger.log("Urls to download are [" + urlsToDownload.size()
+        logger.info("Urls to download are [" + urlsToDownload.size()
                 + "]. Urls are " + urlsToDownload.keySet());
 
         createRowsInTable(urlsToDownload);
@@ -586,7 +586,7 @@ public class ResourceDownLoader extends AppFrame {
     }
 
     private java.util.List<String> getUrlsFromFile(String filePath) {
-        logger.log("Current directory is: " + System.getProperty("user.dir") + ", file path is " + filePath);
+        logger.info("Current directory is: " + System.getProperty("user.dir") + ", file path is " + filePath);
         Path path = Utils.createPath(filePath);
         try {
             return Files.readAllLines(path);
@@ -625,7 +625,7 @@ public class ResourceDownLoader extends AppFrame {
         private final ResourceDownLoader rd;
 
         DownloadStatusCallable(ResourceDownLoader rd, ResourceInfo resourceInfo) {
-            rd.logger.log("Download status tracking start for " + resourceInfo.getOnlyName());
+            rd.logger.info("Download status tracking start for " + resourceInfo.getOnlyName());
             this.resourceInfo = resourceInfo;
             this.fileInfo = resourceInfo.getFileInfo();
             this.rd = rd;
@@ -642,7 +642,7 @@ public class ResourceDownLoader extends AppFrame {
                 fileInfo.setDownloadStartTime(System.currentTimeMillis());
                 sbLogInfo = new StringBuilder(resourceInfo.nameAndStatus());
                 if (resourceInfo.isCancelled() || resourceInfo.exists()) {
-                    rd.logger.log(sbLogInfo.toString());
+                    rd.logger.info(sbLogInfo.toString());
                     break;
                 }
                 try {
@@ -662,7 +662,7 @@ public class ResourceDownLoader extends AppFrame {
                     if (!rd.isUrlsToDownloadEmpty()) {
                         rd.updateTitle(percent + "% at " + speedStr);
                     }
-                    rd.logger.log(sbLogInfo.toString());
+                    rd.logger.info(sbLogInfo.toString());
                 } catch (Exception e) {
                     rd.logger.error("Error in downloading file. Details: " + e.getMessage());
                     break;
@@ -685,14 +685,14 @@ public class ResourceDownLoader extends AppFrame {
         synchronized (ResourceDownLoader.class) {
             urlsToDownload.remove(key);
         }
-        logger.log("Removed url [" + key + "] from download.");
+        logger.info("Removed url [" + key + "] from download.");
         if (urlsToDownload.size() == 0) {
             updateTitle("Done !!");
         }
     }
 
     public void log(String m) {
-        logger.log(m);
+        logger.info(m);
     }
 
     public void updateDownloadTime(FileInfo fileInfo, long time, int i) {

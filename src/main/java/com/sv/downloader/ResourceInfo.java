@@ -34,7 +34,7 @@ public class ResourceInfo {
 
     public void updateResourceInfo(FileOutputStream fos, ReadableByteChannel rbc, FileInfo fileInfo) {
         if (!url.equals(fileInfo.getSrc())) {
-            logger.log(url + " mismatched with " + fileInfo);
+            logger.info(url + " mismatched with " + fileInfo);
             throw new AppException("Url and file information mismatch");
         }
         this.fos = fos;
@@ -75,15 +75,15 @@ public class ResourceInfo {
     }
 
     public void setFileStatus(FileStatus fileStatus) {
-        //logger.log("setFileStatus - "+fileStatus.getVal() + ", fs = " + this.fileStatus);
+        //logger.info("setFileStatus - "+fileStatus.getVal() + ", fs = " + this.fileStatus);
         //if (!isCancelled() && !isFailed()) {
-        //  logger.log("setting - ");
+        //  logger.info("setting - ");
         this.fileStatus = fileStatus;
         //}
     }
 
     public void closeResource() {
-        logger.log("Closing resources for [" + getOnlyName() + "]");
+        logger.info("Closing resources for [" + getOnlyName() + "]");
         if (canMarkCancelled(fileStatus)) {
             synchronized (ResourceInfo.class) {
                 fileStatus = FileStatus.CANCELLED;
@@ -118,7 +118,7 @@ public class ResourceInfo {
         if (!isCancelled()) {
             fileStatus = FileStatus.DOWNLOADED;
         }
-        logger.log(nameAndStatus());
+        logger.info(nameAndStatus());
         closeResource();
     }
 
