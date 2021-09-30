@@ -208,11 +208,8 @@ public class ResourceDownLoader extends AppFrame {
         parentContainer.add(controlsPanel, BorderLayout.NORTH);
         parentContainer.add(jpTblAndUrls, BorderLayout.CENTER);
 
-        addWindowFocusListener(new WindowAdapter() {
-            public void windowGainedFocus(WindowEvent e) {
-                copyClipboard();
-            }
-        });
+        applyWindowActiveCheck(new WindowChecks[]{
+                WindowChecks.WINDOW_ACTIVE, WindowChecks.CLIPBOARD});
 
         setControlsToEnable();
         setToCenter();
@@ -221,30 +218,17 @@ public class ResourceDownLoader extends AppFrame {
         logger.info("Program initialized");
     }
 
-    public void copyClipboard() {
-        final int showDataLimit = 100;
-        Clipboard c = Toolkit.getDefaultToolkit().getSystemClipboard();
+    @Override
+    public void startClipboardAction() {
+        copyClipboard(logger);
+    }
 
-        // Get data stored in the clipboard that is in the form of a string (text)
-        try {
-            String data = c.getData(DataFlavor.stringFlavor).toString().trim();
-            if (Utils.hasValue(data) && !data.equals(lastClipboardText)) {
-                int result = JOptionPane.showConfirmDialog(this,
-                        "Use data [" +
-                                Utils.addBraces(
-                                (data.length() < showDataLimit ? data :
-                                        data.substring(0, showDataLimit) + ELLIPSIS)),
-                        "Copy data from clipboard ?",
-                        JOptionPane.YES_NO_OPTION,
-                        JOptionPane.QUESTION_MESSAGE);
-                if (result == JOptionPane.YES_OPTION) {
-                    taUrls.setText(checkLineEndings(data));
-                }
-                lastClipboardText = data;
-            }
-        } catch (Exception e) {
-            logger.error("Unable to complete clipboard check action.  Error: " + e.getMessage());
-        }
+    public void copyClipboardSuccess(String data) {
+        taUrls.setText(checkLineEndings(data));
+    }
+
+    public void copyClipboardFailed() {
+        // no need to take any action
     }
 
     private String checkLineEndings(String data) {
