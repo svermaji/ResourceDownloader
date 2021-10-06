@@ -223,12 +223,9 @@ public class ResourceDownLoader extends AppFrame {
         copyClipboard(logger);
     }
 
-    public void copyClipboardSuccess(String data) {
+    @Override
+    public void copyClipboardYes(String data) {
         taUrls.setText(checkLineEndings(data));
-    }
-
-    public void copyClipboardFailed() {
-        // no need to take any action
     }
 
     private String checkLineEndings(String data) {
@@ -315,7 +312,7 @@ public class ResourceDownLoader extends AppFrame {
             threadPool.submit(new TrackAllDownloadsCallable(this));
             logger.info("Tracking initiated...");
             URL u = new URL(url);
-            String urlWithBraces =  Utils.addBraces(url);
+            String urlWithBraces = Utils.addBraces(url);
             URLConnection uc = u.openConnection();
             fileInfo = new FileInfo(url, extractPath(url), uc.getContentLength());
             logger.info("Url [" + Utils.getFileName(url) + "] resource size is " + Utils.getFileSizeString(fileInfo.getSize()));
@@ -361,7 +358,7 @@ public class ResourceDownLoader extends AppFrame {
     // reach here after exists is checked
     private boolean sizeMatched(FileInfo fileInfo) {
         boolean result = new File(fileInfo.getDestination()).length() == fileInfo.getSize();
-        logger.info("Result of matching local file size and url file size is " + Utils.addBraces(result+""));
+        logger.info("Result of matching local file size and url file size is " + Utils.addBraces(result + ""));
         return result;
     }
 
@@ -398,12 +395,12 @@ public class ResourceDownLoader extends AppFrame {
     }
 
     public void markDownloadFailed(ResourceInfo info) {
-        info.markFailed ();
+        info.markFailed();
         markDownloadForError(info, FAILED);
     }
 
     public void markDownloadCancelled(ResourceInfo info) {
-        info.markCancel ();
+        info.markCancel();
         markDownloadForError(info, CANCELLED);
     }
 
