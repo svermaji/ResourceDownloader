@@ -315,7 +315,7 @@ public class ResourceDownLoader extends AppFrame {
             String urlWithBraces = Utils.addBraces(url);
             URLConnection uc = u.openConnection();
             fileInfo = new FileInfo(url, extractPath(url), uc.getContentLength());
-            logger.info("Url [" + Utils.getFileName(url) + "] resource size is " + Utils.getFileSizeString(fileInfo.getSize()));
+            logger.info("Url [" + Utils.getFileName(url) + "] resource size is " + Utils.getSizeString(fileInfo.getSize()));
 
             if (fileInfo.getSize() < 0) {
                 resourceInfo.setFileStatus(FileStatus.FAILED);
@@ -636,14 +636,14 @@ public class ResourceDownLoader extends AppFrame {
                     String dest = Utils.hasValue(fileInfo.getFilename()) ? fileInfo.getFilename() : fileInfo.getDestination();
                     long size = Files.size(Utils.createPath(dest));
                     sbLogInfo.append(", size ")
-                            .append(Utils.getFileSizeString(size)).append("/")
-                            .append(Utils.getFileSizeString(fileSize));
+                            .append(Utils.getSizeString(size)).append("/")
+                            .append(Utils.getSizeString(fileSize));
                     percent = (int) ((size * 100) / fileSize);
                     resourceInfo.getFileInfo().setDownloadedSize(size);
                     sbLogInfo.append(", [").append(percent).append("%]");
 
                     // Since thread.sleep is 250, so multiplying by 4, Now trying 1000 so * 1
-                    speedStr = Utils.getFileSizeString(size - lastSize);
+                    speedStr = Utils.getSizeString(size - lastSize);
                     lastSize = size;
                     sbLogInfo.append(" @ ").append(speedStr);
                     if (!rd.isUrlsToDownloadEmpty()) {
@@ -710,7 +710,7 @@ public class ResourceDownLoader extends AppFrame {
     }
 
     private String getDownloadSize(FileInfo fileInfo) {
-        return Utils.getFileSizeString(fileInfo.getDownloadedSize()) + "/" + Utils.getFileSizeString(fileInfo.getSize());
+        return Utils.getSizeString(fileInfo.getDownloadedSize()) + "/" + Utils.getSizeString(fileInfo.getSize());
     }
 
     private String getDownloadTime(FileInfo fileInfo) {
