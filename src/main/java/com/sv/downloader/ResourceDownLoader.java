@@ -141,6 +141,8 @@ public class ResourceDownLoader extends AppFrame {
         trustAllHttps();
         urlsToDownload = new HashMap<>();
 
+        setLogger(logger);
+
         Container parentContainer = getContentPane();
         JPanel controlsPanel = new JPanel();
 
@@ -229,6 +231,10 @@ public class ResourceDownLoader extends AppFrame {
     }
 
     private String checkLineEndings(String data) {
+        String extraData = "Use data [";
+        if (data.startsWith(extraData)) {
+            data = data.substring(extraData.length(), data.length() - 1);
+        }
         String NEW_LINE_REGEX = "\r?\n";
         String SYS_LINE_END = System.lineSeparator();
         return data.replaceAll(NEW_LINE_REGEX, SYS_LINE_END);
