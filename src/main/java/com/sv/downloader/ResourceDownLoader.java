@@ -315,8 +315,6 @@ public class ResourceDownLoader extends AppFrame {
         FileOutputStream fos;
         FileInfo fileInfo;
         try {
-            threadPool.submit(new TrackAllDownloadsCallable(this));
-            logger.info("Tracking initiated...");
             URL u = new URL(url);
             String urlWithBraces = Utils.addBraces(url);
             URLConnection uc = u.openConnection();
@@ -479,7 +477,7 @@ public class ResourceDownLoader extends AppFrame {
             name = "\\" + name;
         }
         String path = destFolder + name;
-        logger.info("Destination path is [" + Utils.addBraces(path));
+        logger.info("Destination path is " + Utils.addBraces(path));
         return path;
     }
 
@@ -536,6 +534,8 @@ public class ResourceDownLoader extends AppFrame {
 
         createRowsInTable(urlsToDownload);
         threadPool.submit(new StartDownloadCallable(this, urlsToDownload));
+        threadPool.submit(new TrackAllDownloadsCallable(this));
+        logger.info("Tracking initiated...");
     }
 
     private List<String> readUrlsFromTextArea() {
@@ -692,6 +692,14 @@ public class ResourceDownLoader extends AppFrame {
         if (isPathMatched(fileInfo.getSrc(), i)) {
             setCellValue(time, i, COLS.TIME.getIdx());
         }
+    }
+
+    public void printStatus() {
+        logger.info(threadPool.toString());
+    }
+
+    public void printStatusComplete() {
+        logger.info("All downloads completed.");
     }
 
     private void updateFileStatus(int percent, ResourceInfo info) {
